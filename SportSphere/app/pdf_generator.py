@@ -113,12 +113,15 @@ def generate_student_report_pdf(student_id: int) -> BytesIO:
     total_hours = round(sum(s['duration_minutes'] for s in sessions) / 60.0, 1)
     rated_sessions = [s['coach_rating'] for s in sessions if s['coach_rating'] is not None]
     avg_rating = round(sum(rated_sessions) / len(rated_sessions), 1) if rated_sessions else "N/A"
+    min_rating = min(rated_sessions) if rated_sessions else "N/A"
+    max_rating = max(rated_sessions) if rated_sessions else "N/A"
     sports_count = len(set(s['sport_name'] for s in sessions))
 
     summary_data = [
         [Paragraph("<b>Total Practice Hours</b>", body_style), Paragraph(f"<b>{total_hours} hrs</b>", body_style)],
         [Paragraph("<b>Practice Sessions Logged</b>", body_style), Paragraph(f"<b>{len(sessions)}</b>", body_style)],
         [Paragraph("<b>Average Coach Rating</b>", body_style), Paragraph(f"<b>{avg_rating}{' / 10' if avg_rating != 'N/A' else ''}</b>", body_style)],
+        [Paragraph("<b>Min / Max Rating Range</b>", body_style), Paragraph(f"<b>Min: {min_rating} / 10 &nbsp;|&nbsp; Max: {max_rating} / 10</b>", body_style)],
         [Paragraph("<b>Active Sports Tracked</b>", body_style), Paragraph(f"<b>{sports_count}</b>", body_style)]
     ]
     t_summary = Table(summary_data, colWidths=[200, 300])

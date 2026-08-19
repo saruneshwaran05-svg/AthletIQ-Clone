@@ -9,8 +9,11 @@ if db_dir and not os.path.exists(db_dir):
 
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 30000;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
@@ -27,7 +30,7 @@ def db_session():
         conn.close()
 
 def init_db():
-    """Initializes the database schema with ZERO pre-populated data."""
+    """Initializes the database schema and indexes."""
     with db_session() as conn:
         cursor = conn.cursor()
         
@@ -107,7 +110,6 @@ def init_db():
         elif 'coach_rating' not in ps_columns:
             cursor.execute("ALTER TABLE practice_sessions ADD COLUMN coach_rating INTEGER CHECK (coach_rating BETWEEN 1 AND 10);")
 
-
         # 5. Dynamic Sport Performance Records
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS performance_records (
@@ -168,11 +170,6 @@ def init_db():
         );
         """)
 
-        cursor.execute("PRAGMA table_info(ai_recommendations);")
-        ar_columns = [row[1] for row in cursor.fetchall()]
-        if 'session_id' not in ar_columns:
-            cursor.execute("ALTER TABLE ai_recommendations ADD COLUMN session_id INTEGER;")
-
         # 9. Coach-Student Connections
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS coach_connections (
@@ -201,6 +198,8 @@ def init_db():
             recommended_drill TEXT,
             practice_duration_minutes INTEGER,
             priority TEXT DEFAULT 'MEDIUM',
+            student_reply TEXT,
+            student_reply_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (coach_id) REFERENCES users(user_id) ON DELETE CASCADE,
             FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE,
@@ -209,7 +208,7 @@ def init_db():
         );
         """)
 
-        # Auto-migrate coach_feedback table for student_reply columns if missing
+        # Auto-migrate existing coach_feedback table for student_reply columns
         cursor.execute("PRAGMA table_info(coach_feedback);")
         cf_columns = [row[1] for row in cursor.fetchall()]
         if 'student_reply' not in cf_columns:
@@ -252,4 +251,56 @@ def init_db():
         );
         """)
 
-        print("Database schema initialized at:", DB_PATH)
+        # Performance & Security Indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ps_student_sport ON practice_sessions(student_id, sport_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_recs_student ON ai_recommendations(student_id, sport_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_analyses_student ON ai_analyses(student_id, sport_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_student_sports ON student_sports(student_id, sport_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_perf_records_session ON performance_records(session_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_problems_session ON problems(session_id);")
+
+        seed_default_sports(cursor)
+        print("Database schema initialized and hardened at:", DB_PATH)
+
+
+def seed_default_sports(cursor):
+    """Populates standard sports if sports table is empty."""
+    cursor.execute("SELECT COUNT(*) as count FROM sports")
+    if cursor.fetchone()["count"] == 0:
+        default_sports = [
+            ("Cricket", "OUTDOOR"),
+            ("Football", "OUTDOOR"),
+            ("Basketball", "INDOOR"),
+            ("Badminton", "INDOOR"),
+            ("Tennis", "OUTDOOR"),
+            ("Volleyball", "INDOOR"),
+            ("Swimming", "INDOOR"),
+            ("Athletics", "OUTDOOR"),
+            ("Table Tennis", "INDOOR"),
+            ("Chess", "INDOOR"),
+            ("Boxing", "INDOOR"),
+            ("Golf", "OUTDOOR"),
+            ("Hockey", "OUTDOOR"),
+            ("Baseball", "OUTDOOR")
+        ]
+        cursor.executemany("INSERT INTO sports (name, category, is_custom) VALUES (?, ?, 0)", default_sports)
+
+
+def clear_all_data():
+    """Wipes all data from all tables cleanly."""
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = OFF;")
+        tables = [
+            "notifications", "goals", "coach_feedback", "coach_connections",
+            "ai_recommendations", "ai_analyses", "problems", "performance_records",
+            "practice_sessions", "student_sports", "sports", "users"
+        ]
+        for t in tables:
+            cursor.execute(f"DELETE FROM {t};")
+            cursor.execute(f"DELETE FROM sqlite_sequence WHERE name='{t}';")
+        cursor.execute("PRAGMA foreign_keys = ON;")
+        seed_default_sports(cursor)
+        print("All database records cleared successfully.")
+

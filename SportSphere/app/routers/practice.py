@@ -87,6 +87,8 @@ def get_metric_template(sport_name: str):
         {"name": "errors", "label": "Errors / Faults", "unit": "count", "type": "number"}
     ])
 
+from app.ai_engine import run_student_ai_analysis
+
 @router.post("/sessions")
 def create_practice_session(req: PracticeSessionCreate, user: dict = Depends(require_student)):
     with db_session() as conn:
@@ -125,10 +127,16 @@ def create_practice_session(req: PracticeSessionCreate, user: dict = Depends(req
         # Check if student achieved any active AI goals
         _check_student_goals_achievement(cursor, user["user_id"], req.sport_id)
 
-        return {
-            "message": "Practice session recorded successfully",
-            "session_id": session_id
-        }
+    # Automatically trigger AI analysis generation for student
+    try:
+        run_student_ai_analysis(user["user_id"], req.sport_id)
+    except Exception as e:
+        print("AI analysis auto-trigger error:", e)
+
+    return {
+        "message": "Practice session recorded successfully",
+        "session_id": session_id
+    }
 
 def _check_student_goals_achievement(cursor, student_id: int, sport_id: int):
     cursor.execute("""

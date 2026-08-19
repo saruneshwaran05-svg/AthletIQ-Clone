@@ -2,6 +2,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Attach to Chrome",
+            "port": 9222,
+            "request": "attach",
+            "type": "chrome",
+            "webRoot": "${workspaceFolder}"
+        },
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Launch Chrome",
             "request": "launch",
             "type": "chrome",
@@ -9,18 +23,23 @@
             "webRoot": "${workspaceFolder}"
         },
         {
-            "name": "Python: Run AthletIQ App",
+            "name": "⚡ Run AthletIQ Server (http://127.0.0.1:8000)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/run.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/SportSphere",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/SportSphere;${workspaceFolder}"
+            },
+            "subProcess": true
         },
         {
-            "name": "Launch Chrome against localhost:8000",
+            "name": "🌐 Open Browser (http://127.0.0.1:8000)",
             "type": "chrome",
             "request": "launch",
             "url": "http://127.0.0.1:8000",
-            "webRoot": "${workspaceFolder}"
+            "webRoot": "${workspaceFolder}/SportSphere"
         }
     ]
 }

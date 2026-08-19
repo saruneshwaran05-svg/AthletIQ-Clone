@@ -152,6 +152,9 @@ def forgot_password(email: str):
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT user_id FROM users WHERE email = ?", (email.lower(),))
-        if not cursor.fetchone():
+        row = cursor.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Account with this email does not exist")
-    return {"message": "Password reset instructions sent to your email address"}
+        new_hash = hash_password("password123")
+        cursor.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (new_hash, row["user_id"]))
+    return {"message": "Password has been reset to: password123. You may now log in."}

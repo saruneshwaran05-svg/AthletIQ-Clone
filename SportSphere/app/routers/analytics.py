@@ -15,7 +15,9 @@ def get_analytics_overview(sport_id: Optional[int] = None, student_id: Optional[
         query = """
             SELECT COUNT(*) as session_count, 
                    COALESCE(SUM(duration_minutes), 0) as total_minutes,
-                   COALESCE(AVG(coach_rating), 0) as avg_rating
+                   COALESCE(AVG(coach_rating), 0) as avg_rating,
+                   MIN(coach_rating) as min_rating,
+                   MAX(coach_rating) as max_rating
             FROM practice_sessions
             WHERE student_id = ?
         """
@@ -35,9 +37,10 @@ def get_analytics_overview(sport_id: Optional[int] = None, student_id: Optional[
         total_hours = round(row["total_minutes"] / 60.0, 1)
         avg_rating = round(row["avg_rating"], 1)
         
-        # Improvement Score computation
+        # Improvement Score & Ratings List
         improvement_score = 0
-        if session_count >= 2:
+        ratings = []
+        if session_count >= 1:
             query_ratings = """
                 SELECT coach_rating FROM practice_sessions 
                 WHERE student_id = ? AND coach_rating IS NOT NULL
@@ -67,6 +70,9 @@ def get_analytics_overview(sport_id: Optional[int] = None, student_id: Optional[
             "active_sports": sports_count,
             "sport_name": sport_name,
             "average_rating": avg_rating,
+            "min_rating": row["min_rating"],
+            "max_rating": row["max_rating"],
+            "all_ratings": ratings,
             "improvement_score": improvement_score,
             "has_data": session_count > 0
         }
@@ -223,12 +229,22 @@ def get_per_sport_statistics(student_id: Optional[int] = None, user: dict = Depe
                 SELECT COUNT(*) as session_count,
                        COALESCE(SUM(duration_minutes), 0) as total_minutes,
                        COALESCE(AVG(coach_rating), 0) as avg_rating,
+                       MIN(coach_rating) as min_rating,
+                       MAX(coach_rating) as max_rating,
                        MAX(date) as last_practice_date
                 FROM practice_sessions
                 WHERE student_id = ? AND sport_id = ?
             """, (target_student_id, sp_id))
             sess_row = dict(cursor.fetchone())
             
+            cursor.execute("""
+                SELECT coach_rating
+                FROM practice_sessions
+                WHERE student_id = ? AND sport_id = ? AND coach_rating IS NOT NULL
+                ORDER BY date ASC, session_id ASC
+            """, (target_student_id, sp_id))
+            all_ratings = [r["coach_rating"] for r in cursor.fetchall()]
+
             cursor.execute("""
                 SELECT pr.metric_name, 
                        AVG(pr.metric_value) as avg_val,
@@ -244,13 +260,24 @@ def get_per_sport_statistics(student_id: Optional[int] = None, user: dict = Depe
             """, (target_student_id, sp_id))
             metric_stats = []
             for mr in cursor.fetchall():
+                m_name = mr["metric_name"]
+                cursor.execute("""
+                    SELECT pr.metric_value
+                    FROM performance_records pr
+                    JOIN practice_sessions ps ON pr.session_id = ps.session_id
+                    WHERE ps.student_id = ? AND ps.sport_id = ? AND pr.metric_name = ?
+                    ORDER BY ps.date ASC, ps.session_id ASC
+                """, (target_student_id, sp_id, m_name))
+                all_metric_values = [round(r["metric_value"], 2) for r in cursor.fetchall() if r["metric_value"] is not None]
+
                 metric_stats.append({
-                    "metric_name": mr["metric_name"],
-                    "average": round(mr["avg_val"], 2),
-                    "max": round(mr["max_val"], 2),
-                    "min": round(mr["min_val"], 2),
+                    "metric_name": m_name,
+                    "average": round(mr["avg_val"], 2) if mr["avg_val"] is not None else 0.0,
+                    "max": round(mr["max_val"], 2) if mr["max_val"] is not None else 0.0,
+                    "min": round(mr["min_val"], 2) if mr["min_val"] is not None else 0.0,
                     "total_records": mr["total_records"],
-                    "unit": mr["metric_unit"] or "count"
+                    "unit": mr["metric_unit"] or "count",
+                    "all_values": all_metric_values
                 })
 
             cursor.execute("""
@@ -271,16 +298,10 @@ def get_per_sport_statistics(student_id: Optional[int] = None, user: dict = Depe
             """, (target_student_id, sp_id))
             struggles = [{"issue": r["description"], "count": r["cnt"]} for r in cursor.fetchall()]
 
-            cursor.execute("""
-                SELECT coach_rating FROM practice_sessions
-                WHERE student_id = ? AND sport_id = ? AND coach_rating IS NOT NULL
-                ORDER BY date ASC, session_id ASC
-            """, (target_student_id, sp_id))
-            ratings = [r["coach_rating"] for r in cursor.fetchall()]
             improvement = 0.0
-            if len(ratings) >= 2:
-                recent = sum(ratings[-3:]) / len(ratings[-3:])
-                older = sum(ratings[:max(1, len(ratings)-3)]) / len(ratings[:max(1, len(ratings)-3)])
+            if len(all_ratings) >= 2:
+                recent = sum(all_ratings[-3:]) / len(all_ratings[-3:])
+                older = sum(all_ratings[:max(1, len(all_ratings)-3)]) / len(all_ratings[:max(1, len(all_ratings)-3)])
                 improvement = round(((recent - older) / max(1, older)) * 100, 1)
 
             sports_stats.append({
@@ -293,6 +314,9 @@ def get_per_sport_statistics(student_id: Optional[int] = None, user: dict = Depe
                 "session_count": sess_row["session_count"],
                 "total_hours": round(sess_row["total_minutes"] / 60.0, 1),
                 "average_rating": round(sess_row["avg_rating"], 1),
+                "min_rating": round(sess_row["min_rating"], 1) if sess_row["min_rating"] is not None else None,
+                "max_rating": round(sess_row["max_rating"], 1) if sess_row["max_rating"] is not None else None,
+                "all_ratings": all_ratings,
                 "last_practice_date": sess_row["last_practice_date"] or "N/A",
                 "improvement_score": improvement,
                 "intensity_breakdown": intensity_counts,
@@ -305,4 +329,5 @@ def get_per_sport_statistics(student_id: Optional[int] = None, user: dict = Depe
             "total_sports": len(sports_stats),
             "sports": sports_stats
         }
+
 

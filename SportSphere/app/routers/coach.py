@@ -246,7 +246,10 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
             
         # Get student info
         cursor.execute("SELECT user_id, name, email, preferred_sport, bio, profile_photo FROM users WHERE user_id = ?", (student_id,))
-        student = dict(cursor.fetchone())
+        student_row = cursor.fetchone()
+        if not student_row:
+            raise HTTPException(status_code=404, detail="Student record not found.")
+        student = dict(student_row)
         
         spec = _get_coach_spec(cursor, user["user_id"])
         sport_clause = ""
@@ -255,16 +258,36 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
             sport_clause = " AND (LOWER(s.name) LIKE ? OR LOWER(?) LIKE '%' || LOWER(s.name) || '%')"
             sport_params = [f"%{spec}%", spec]
 
-        # Get student sports (filtered by coach specialization if defined)
+        # Get student sports (from student_sports OR from logged practice sessions, filtered by coach specialization if defined)
         query_sports = f"""
-            SELECT s.sport_id, s.name, s.category, ss.skill_level, ss.experience_years, ss.training_goal
-            FROM student_sports ss
-            JOIN sports s ON ss.sport_id = s.sport_id
-            WHERE ss.student_id = ? {sport_clause}
+            SELECT DISTINCT s.sport_id, s.name, s.category,
+                   COALESCE(ss.skill_level, 'ACTIVE') as skill_level,
+                   COALESCE(ss.experience_years, 0.0) as experience_years,
+                   ss.training_goal
+            FROM sports s
+            LEFT JOIN student_sports ss ON s.sport_id = ss.sport_id AND ss.student_id = ?
+            WHERE s.sport_id IN (
+                SELECT sport_id FROM student_sports WHERE student_id = ?
+                UNION
+                SELECT sport_id FROM practice_sessions WHERE student_id = ?
+            ) {sport_clause}
         """
-        cursor.execute(query_sports, [student_id] + sport_params)
+        cursor.execute(query_sports, [student_id, student_id, student_id] + sport_params)
         sports = [dict(r) for r in cursor.fetchall()]
         
+        # Fallback if sports list is empty and no specialization filter blocked it: query all sports for student
+        if not sports and not spec:
+            cursor.execute("""
+                SELECT DISTINCT s.sport_id, s.name, s.category
+                FROM sports s
+                WHERE s.sport_id IN (
+                    SELECT sport_id FROM student_sports WHERE student_id = ?
+                    UNION
+                    SELECT sport_id FROM practice_sessions WHERE student_id = ?
+                )
+            """, (student_id, student_id))
+            sports = [dict(r) for r in cursor.fetchall()]
+
         # Get practice sessions for coached sports
         query_sessions = f"""
             SELECT ps.session_id, ps.sport_id, s.name as sport_name, ps.date, ps.duration_minutes,
@@ -345,12 +368,23 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
                 SELECT COUNT(*) as session_count,
                        COALESCE(SUM(duration_minutes), 0) as total_minutes,
                        COALESCE(AVG(coach_rating), 0) as avg_rating,
+                       MIN(coach_rating) as min_rating,
+                       MAX(coach_rating) as max_rating,
                        MAX(date) as last_practice_date
                 FROM practice_sessions
                 WHERE student_id = ? AND sport_id = ?
             """, (student_id, sp_id))
-            sess_row = dict(cursor.fetchone())
+            sess_row_raw = cursor.fetchone()
+            sess_row = dict(sess_row_raw) if sess_row_raw else {"session_count": 0, "total_minutes": 0, "avg_rating": 0, "min_rating": None, "max_rating": None, "last_practice_date": "N/A"}
             
+            cursor.execute("""
+                SELECT coach_rating
+                FROM practice_sessions
+                WHERE student_id = ? AND sport_id = ? AND coach_rating IS NOT NULL
+                ORDER BY date ASC, session_id ASC
+            """, (student_id, sp_id))
+            all_ratings = [r["coach_rating"] for r in cursor.fetchall()]
+
             cursor.execute("""
                 SELECT pr.metric_name, 
                        AVG(pr.metric_value) as avg_val,
@@ -366,13 +400,24 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
             """, (student_id, sp_id))
             metric_stats = []
             for mr in cursor.fetchall():
+                m_name = mr["metric_name"]
+                cursor.execute("""
+                    SELECT pr.metric_value
+                    FROM performance_records pr
+                    JOIN practice_sessions ps ON pr.session_id = ps.session_id
+                    WHERE ps.student_id = ? AND ps.sport_id = ? AND pr.metric_name = ?
+                    ORDER BY ps.date ASC, ps.session_id ASC
+                """, (student_id, sp_id, m_name))
+                all_metric_values = [round(r["metric_value"], 2) for r in cursor.fetchall() if r["metric_value"] is not None]
+
                 metric_stats.append({
-                    "metric_name": mr["metric_name"],
-                    "average": round(mr["avg_val"], 2),
-                    "max": round(mr["max_val"], 2),
-                    "min": round(mr["min_val"], 2),
+                    "metric_name": m_name,
+                    "average": round(mr["avg_val"], 2) if mr["avg_val"] is not None else 0.0,
+                    "max": round(mr["max_val"], 2) if mr["max_val"] is not None else 0.0,
+                    "min": round(mr["min_val"], 2) if mr["min_val"] is not None else 0.0,
                     "total_records": mr["total_records"],
-                    "unit": mr["metric_unit"] or "count"
+                    "unit": mr["metric_unit"] or "count",
+                    "all_values": all_metric_values
                 })
 
             cursor.execute("""
@@ -385,6 +430,12 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
             """, (student_id, sp_id))
             struggles = [{"issue": r["description"], "count": r["cnt"]} for r in cursor.fetchall()]
 
+            improvement = 0.0
+            if len(all_ratings) >= 2:
+                recent = sum(all_ratings[-3:]) / len(all_ratings[-3:])
+                older = sum(all_ratings[:max(1, len(all_ratings)-3)]) / len(all_ratings[:max(1, len(all_ratings)-3)])
+                improvement = round(((recent - older) / max(1, older)) * 100, 1)
+
             sports_statistics.append({
                 "sport_id": sp_id,
                 "sport_name": sp["sport_name"],
@@ -392,8 +443,12 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
                 "skill_level": sp["skill_level"] or "Unspecified",
                 "session_count": sess_row["session_count"],
                 "total_hours": round(sess_row["total_minutes"] / 60.0, 1),
-                "average_rating": round(sess_row["avg_rating"], 1),
+                "average_rating": round(sess_row["avg_rating"], 1) if sess_row["avg_rating"] is not None else 0.0,
+                "min_rating": round(sess_row["min_rating"], 1) if sess_row["min_rating"] is not None else None,
+                "max_rating": round(sess_row["max_rating"], 1) if sess_row["max_rating"] is not None else None,
+                "all_ratings": all_ratings,
                 "last_practice_date": sess_row["last_practice_date"] or "N/A",
+                "improvement_score": improvement,
                 "metrics": metric_stats,
                 "struggles": struggles
             })

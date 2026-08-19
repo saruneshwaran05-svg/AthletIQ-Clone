@@ -314,11 +314,84 @@ function showSavedAccountsPopover(filterVal = '') {
           </div>
           <div class="text-[11px] text-slate-400 font-medium">${acc.email}</div>
         </div>
+        <button type="button" onclick="deleteSingleRememberedLogin('${acc.email}', event)" title="Delete saved login" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-700/50 transition">
+          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
     `;
   });
 
+  if (window.lucide) window.lucide.createIcons();
   popover.classList.remove('hidden');
+}
+
+function clearAllRememberedLogins() {
+  const keysToClear = [
+    'athletiq_remembered_students',
+    'athletiq_remembered_coaches',
+    'athletiq_saved_accounts_v2',
+    'athletiq_last_remembered_student_cred',
+    'athletiq_last_remembered_coach_cred',
+    'athletiq_last_remembered_student_email',
+    'athletiq_last_remembered_coach_email',
+    'athletiq_remember_email'
+  ];
+  keysToClear.forEach(k => {
+    try { localStorage.removeItem(k); } catch (e) {}
+  });
+
+  const emailInput = document.getElementById('login-email');
+  const passwordInput = document.getElementById('login-password');
+  const rememberCheckbox = document.getElementById('login-remember-me');
+  if (emailInput) emailInput.value = '';
+  if (passwordInput) passwordInput.value = '';
+  if (rememberCheckbox) rememberCheckbox.checked = false;
+
+  const popover = document.getElementById('login-saved-accounts-popover');
+  if (popover) popover.classList.add('hidden');
+
+  showToast('All remembered logins cleared successfully', 'info');
+}
+
+function deleteSingleRememberedLogin(email, e) {
+  if (e) e.stopPropagation();
+  if (!email) return;
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  ['athletiq_remembered_students', 'athletiq_remembered_coaches', 'athletiq_saved_accounts_v2'].forEach(key => {
+    try {
+      let raw = JSON.parse(localStorage.getItem(key)) || [];
+      if (Array.isArray(raw)) {
+        raw = raw.filter(item => {
+          const itemEmail = typeof item === 'string' ? item : item.email;
+          return itemEmail && itemEmail.toLowerCase() !== cleanEmail;
+        });
+        localStorage.setItem(key, JSON.stringify(raw));
+      }
+    } catch (err) {}
+  });
+
+  ['athletiq_last_remembered_student_cred', 'athletiq_last_remembered_coach_cred'].forEach(key => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.email && parsed.email.toLowerCase() === cleanEmail) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (err) {}
+  });
+
+  const emailInput = document.getElementById('login-email');
+  if (emailInput && emailInput.value.trim().toLowerCase() === cleanEmail) {
+    emailInput.value = '';
+    const passwordInput = document.getElementById('login-password');
+    if (passwordInput) passwordInput.value = '';
+  }
+
+  showSavedAccountsPopover();
 }
 
 function selectSavedAccount(email) {
@@ -678,6 +751,27 @@ function authHeaders() {
   };
 }
 
+async function safeFetchJson(url, options = {}) {
+  const reqHeaders = Object.assign({}, authHeaders(), options.headers || {});
+  const config = Object.assign({}, options, { headers: reqHeaders });
+  const res = await fetch(url, config);
+  const contentType = res.headers.get('content-type') || '';
+  let data = {};
+  if (contentType.includes('application/json')) {
+    data = await res.json().catch(() => ({}));
+  } else {
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`Server Error (${res.status}): ${text.substring(0, 100)}`);
+    }
+    return { text };
+  }
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Request failed with status ${res.status}`);
+  }
+  return data;
+}
+
 // STUDENT DASHBOARD
 async function loadStudentDashboard(sportId = null) {
   document.getElementById('dashboard-welcome-heading').textContent = `Welcome, ${currentUser.name}!`;
@@ -707,7 +801,11 @@ async function loadStudentDashboard(sportId = null) {
       document.getElementById('dash-card-sports').textContent = data.active_sports;
     }
 
-    document.getElementById('dash-card-rating').textContent = `${data.average_rating} / 10`;
+    if (data.min_rating !== null && data.min_rating !== undefined && data.max_rating !== null && data.max_rating !== undefined) {
+      document.getElementById('dash-card-rating').innerHTML = `${data.average_rating} <span class="text-xs font-normal text-slate-400">/ 10</span> <div class="text-[10px] text-slate-500 font-semibold mt-0.5">Min: <span class="text-blue-600 dark:text-blue-400">${data.min_rating}</span> | Max: <span class="text-emerald-600 dark:text-emerald-400">${data.max_rating}</span></div>`;
+    } else {
+      document.getElementById('dash-card-rating').textContent = `${data.average_rating} / 10`;
+    }
     document.getElementById('dash-card-improvement').textContent = `${data.improvement_score > 0 ? '+' : ''}${data.improvement_score}%`;
 
     const emptyBox = document.getElementById('dash-empty-state');
@@ -1317,11 +1415,34 @@ function renderSportStatCard(sp, isCompact = false) {
   const icon = getSportIcon(sp.sport_name);
   const metricsHtml = (sp.metrics && sp.metrics.length > 0)
     ? sp.metrics.map(m => `
-        <div class="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-700/50 text-xs">
-          <span class="text-slate-600 dark:text-slate-300 font-medium">${m.metric_name}:</span>
-          <span class="font-extrabold text-slate-800 dark:text-slate-100">
-            Avg ${m.average} ${m.unit} <span class="text-[10px] text-slate-400 font-normal">(Max: ${m.max})</span>
-          </span>
+        <div class="p-2.5 bg-slate-50 dark:bg-slate-700/40 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-1">
+              <span>🎯</span>
+              <span>${m.metric_name}</span>
+            </span>
+            <span class="text-[10px] px-2 py-0.5 bg-slate-200 dark:bg-slate-600/80 rounded-md text-slate-700 dark:text-slate-200 font-bold">${m.total_records} logs</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5 text-center p-1.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Min Score</span>
+              <span class="font-extrabold text-blue-600 dark:text-blue-400 text-xs">${m.min} ${m.unit}</span>
+            </div>
+            <div>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Max Score</span>
+              <span class="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs">${m.max} ${m.unit}</span>
+            </div>
+            <div>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Avg Score</span>
+              <span class="font-extrabold text-indigo-600 dark:text-indigo-400 text-xs">${m.average} ${m.unit}</span>
+            </div>
+          </div>
+          ${m.all_values && m.all_values.length > 0 ? `
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 pt-0.5 flex items-center space-x-1 flex-wrap">
+              <span class="font-bold text-slate-700 dark:text-slate-300">All Scorings:</span>
+              <span class="font-mono bg-slate-100 dark:bg-slate-900/60 px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-200 font-semibold">[${m.all_values.join(', ')}] ${m.unit}</span>
+            </div>
+          ` : ''}
         </div>
       `).join('')
     : `<p class="text-[11px] text-slate-400 italic py-1">No metric records logged yet.</p>`;
@@ -1341,6 +1462,23 @@ function renderSportStatCard(sp, isCompact = false) {
        </span>`
     : '';
 
+  const allRatingsBadges = (sp.all_ratings && sp.all_ratings.length > 0)
+    ? `<div class="mt-2 text-xs bg-slate-50 dark:bg-slate-700/30 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1">
+            <span>⭐</span>
+            <span>All Coach Ratings Logged (${sp.all_ratings.length}):</span>
+          </span>
+          <span class="text-[10px] text-slate-400 font-medium">Min: <b class="text-blue-600 dark:text-blue-400">${sp.min_rating ?? 'N/A'}</b> | Max: <b class="text-emerald-600 dark:text-emerald-400">${sp.max_rating ?? 'N/A'}</b></span>
+        </div>
+        <div class="flex flex-wrap gap-1">
+          ${sp.all_ratings.map((r, idx) => `
+            <span class="px-2 py-0.5 bg-brand-50 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-md text-[10px] font-extrabold border border-brand-200 dark:border-brand-800" title="Session #${idx+1} Rating">${r}/10</span>
+          `).join('')}
+        </div>
+       </div>`
+    : '';
+
   return `
     <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
       <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-2.5">
@@ -1357,8 +1495,8 @@ function renderSportStatCard(sp, isCompact = false) {
         ${improvementBadge}
       </div>
 
-      <!-- Quick Stats Grid -->
-      <div class="grid grid-cols-3 gap-2 text-center bg-slate-50 dark:bg-slate-700/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
+      <!-- Quick Stats Grid with Min / Max -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center bg-slate-50 dark:bg-slate-700/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
         <div>
           <div class="text-[10px] font-bold text-slate-400 uppercase">Hours</div>
           <div class="text-sm font-extrabold text-brand-600 dark:text-brand-400">${sp.total_hours}h</div>
@@ -1368,14 +1506,22 @@ function renderSportStatCard(sp, isCompact = false) {
           <div class="text-sm font-extrabold text-slate-800 dark:text-slate-100">${sp.session_count}</div>
         </div>
         <div>
+          <div class="text-[10px] font-bold text-slate-400 uppercase">Min / Max Rating</div>
+          <div class="text-xs font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">
+            ${sp.min_rating !== null && sp.min_rating !== undefined ? `<span class="text-blue-600 dark:text-blue-400">${sp.min_rating}</span> / <span class="text-emerald-600 dark:text-emerald-400">${sp.max_rating}</span>` : 'N/A'}
+          </div>
+        </div>
+        <div>
           <div class="text-[10px] font-bold text-slate-400 uppercase">Avg Rating</div>
           <div class="text-sm font-extrabold ${sp.average_rating > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}">${sp.average_rating > 0 ? sp.average_rating + '/10' : 'N/A'}</div>
         </div>
       </div>
 
-      <!-- Dynamic Metric Breakdown -->
-      <div class="space-y-1">
-        <div class="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Sport Metrics Summary</div>
+      ${allRatingsBadges}
+
+      <!-- Dynamic Metric Breakdown with Min, Max, Avg, and All Scorings -->
+      <div class="space-y-2">
+        <div class="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Sport Metrics & Scorings Breakdown</div>
         ${metricsHtml}
       </div>
 
@@ -2200,15 +2346,20 @@ function renderCoachStudentCards(students, container) {
 // COACH STUDENT DETAIL & SESSION RATING MODAL HANDLER
 async function openCoachStudentDetailModal(studentId) {
   try {
-    const res = await fetch(`/api/coach/students/${studentId}`, { headers: authHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to load student details');
-
+    const data = await safeFetchJson(`/api/coach/students/${studentId}`);
     const s = data.student;
-    document.getElementById('csd-student-id').value = studentId;
-    document.getElementById('csd-name').textContent = s.name;
-    document.getElementById('csd-avatar').textContent = s.name ? s.name.charAt(0).toUpperCase() : 'S';
-    document.getElementById('csd-info').textContent = `${s.email} • Coached Sport Filter: ${data.coached_sport_filter}`;
+
+    const idEl = document.getElementById('csd-student-id');
+    if (idEl) idEl.value = studentId;
+
+    const nameEl = document.getElementById('csd-name');
+    if (nameEl) nameEl.textContent = s.name;
+
+    const avatarEl = document.getElementById('csd-avatar');
+    if (avatarEl) avatarEl.textContent = s.name ? s.name.charAt(0).toUpperCase() : 'S';
+
+    const infoEl = document.getElementById('csd-info');
+    if (infoEl) infoEl.textContent = `${s.email} • Coached Sport Filter: ${data.coached_sport_filter}`;
 
     // Populate Sport select options for Drill performance suggestion form
     const sportSelect = document.getElementById('csd-sport-select');
@@ -2216,10 +2367,25 @@ async function openCoachStudentDetailModal(studentId) {
       sportSelect.innerHTML = '';
       if (data.sports && data.sports.length > 0) {
         data.sports.forEach(sp => {
-          sportSelect.innerHTML += `<option value="${sp.sport_id}">${sp.name}</option>`;
+          sportSelect.innerHTML += `<option value="${sp.sport_id}">${sp.name || sp.sport_name}</option>`;
+        });
+      } else if (data.sports_statistics && data.sports_statistics.length > 0) {
+        data.sports_statistics.forEach(sp => {
+          sportSelect.innerHTML += `<option value="${sp.sport_id}">${sp.sport_name}</option>`;
         });
       } else {
         sportSelect.innerHTML = '<option value="">No sport available</option>';
+      }
+    }
+
+    // Populate Session select options if element exists
+    const sessionSelect = document.getElementById('csd-session-select');
+    if (sessionSelect) {
+      sessionSelect.innerHTML = '<option value="">All Sessions (General Drill Suggestion)</option>';
+      if (data.sessions && data.sessions.length > 0) {
+        data.sessions.forEach(sess => {
+          sessionSelect.innerHTML += `<option value="${sess.session_id}">Session ${sess.date} (${sess.sport_name})</option>`;
+        });
       }
     }
 
@@ -2238,104 +2404,108 @@ async function openCoachStudentDetailModal(studentId) {
 
     // Render AI Suggestions for coached sports
     const aiContainer = document.getElementById('csd-ai-suggestions-container');
-    aiContainer.innerHTML = '';
+    if (aiContainer) {
+      aiContainer.innerHTML = '';
 
-    if (!data.ai_recommendations || data.ai_recommendations.length === 0) {
-      aiContainer.innerHTML = `<p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">No AI suggestions generated yet for coached sport (${data.coached_sport_filter}). Record sessions and run AI analysis.</p>`;
-    } else {
-      data.ai_recommendations.forEach(r => {
-        aiContainer.innerHTML += `
-          <div class="p-3.5 bg-brand-50/60 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-800 text-xs">
-            <div class="flex justify-between font-bold text-brand-700 dark:text-brand-300 mb-1">
-              <span>${r.sport_name}: ${r.title}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-brand-200 dark:bg-brand-800 text-brand-900 dark:text-brand-100 font-extrabold">${r.priority} PRIORITY</span>
+      if (!data.ai_recommendations || data.ai_recommendations.length === 0) {
+        aiContainer.innerHTML = `<p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">No AI suggestions generated yet for coached sport (${data.coached_sport_filter}). Record sessions and run AI analysis.</p>`;
+      } else {
+        data.ai_recommendations.forEach(r => {
+          aiContainer.innerHTML += `
+            <div class="p-3.5 bg-brand-50/60 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-800 text-xs">
+              <div class="flex justify-between font-bold text-brand-700 dark:text-brand-300 mb-1">
+                <span>⚡ ${r.sport_name}: ${r.title}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-brand-200 dark:bg-brand-800 text-brand-900 dark:text-brand-100 font-extrabold">${r.priority} PRIORITY</span>
+              </div>
+              <div class="text-slate-700 dark:text-slate-200 mb-1"><b>Recommendation:</b> ${r.recommendation_text}</div>
+              <div class="text-[11px] text-slate-500"><b>Issue:</b> ${r.detected_issue} | <b>Evidence:</b> ${r.evidence}</div>
             </div>
-            <div class="text-slate-700 dark:text-slate-200 mb-1"><b>Recommendation:</b> ${r.recommendation_text}</div>
-            <div class="text-[11px] text-slate-500"><b>Issue:</b> ${r.detected_issue} | <b>Evidence:</b> ${r.evidence}</div>
-          </div>
-        `;
-      });
-    }
+          `;
+        });
+      }
 
-    // Render History of Coach Drill Suggestions & Student Replies
-    if (data.coach_feedbacks && data.coach_feedbacks.length > 0) {
-      let fbHtml = '<div class="space-y-2 text-xs pt-3 mt-3 border-t border-slate-200 dark:border-slate-700"><h4 class="font-extrabold text-slate-800 dark:text-slate-200 flex items-center space-x-1"><span>💬 Sent Suggestions & Student Replies</span></h4>';
-      data.coach_feedbacks.forEach(f => {
-        const replyHtml = f.student_reply ? `
-          <div class="mt-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
-            <div class="font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-between text-[11px]">
-              <span>💬 Student Reply Received:</span>
-              <span class="text-[10px] text-slate-400 font-normal">${new Date(f.student_reply_at || Date.now()).toLocaleDateString()}</span>
+      // Render History of Coach Drill Suggestions & Student Replies
+      if (data.coach_feedbacks && data.coach_feedbacks.length > 0) {
+        let fbHtml = '<div class="space-y-2 text-xs pt-3 mt-3 border-t border-slate-200 dark:border-slate-700"><h4 class="font-extrabold text-slate-800 dark:text-slate-200 flex items-center space-x-1"><span>💬 Sent Suggestions & Student Replies</span></h4>';
+        data.coach_feedbacks.forEach(f => {
+          const replyHtml = f.student_reply ? `
+            <div class="mt-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
+              <div class="font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-between text-[11px]">
+                <span>💬 Student Reply Received:</span>
+                <span class="text-[10px] text-slate-400 font-normal">${new Date(f.student_reply_at || Date.now()).toLocaleDateString()}</span>
+              </div>
+              <p class="text-slate-800 dark:text-slate-200 mt-1 font-medium italic">"${f.student_reply}"</p>
             </div>
-            <p class="text-slate-800 dark:text-slate-200 mt-1 font-medium italic">"${f.student_reply}"</p>
-          </div>
-        ` : `<div class="mt-1 text-[10px] text-slate-400 italic">⏳ Waiting for student reply...</div>`;
+          ` : `<div class="mt-1 text-[10px] text-slate-400 italic">⏳ Waiting for student reply...</div>`;
 
-        fbHtml += `
-          <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
-            <div class="flex justify-between font-bold text-slate-900 dark:text-white">
-              <span>${f.sport_name}: ${f.recommended_drill || 'Coaching Feedback'}</span>
-              <span class="text-[10px] text-slate-400">${new Date(f.created_at || Date.now()).toLocaleDateString()}</span>
+          fbHtml += `
+            <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+              <div class="flex justify-between font-bold text-slate-900 dark:text-white">
+                <span>${f.sport_name}: ${f.recommended_drill || 'Coaching Feedback'}</span>
+                <span class="text-[10px] text-slate-400">${new Date(f.created_at || Date.now()).toLocaleDateString()}</span>
+              </div>
+              <p class="text-slate-600 dark:text-slate-300">${f.feedback_text}</p>
+              ${replyHtml}
             </div>
-            <p class="text-slate-600 dark:text-slate-300">${f.feedback_text}</p>
-            ${replyHtml}
-          </div>
-        `;
-      });
-      fbHtml += '</div>';
-      aiContainer.innerHTML += fbHtml;
+          `;
+        });
+        fbHtml += '</div>';
+        aiContainer.innerHTML += fbHtml;
+      }
     }
 
     // Render Session-Wise Analytics & Rating Generator
     const sessContainer = document.getElementById('csd-sessions-container');
-    sessContainer.innerHTML = '';
+    if (sessContainer) {
+      sessContainer.innerHTML = '';
+      if (!data.sessions || data.sessions.length === 0) {
+        sessContainer.innerHTML = `<p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">No sessions logged for ${data.coached_sport_filter}.</p>`;
+      } else {
+        data.sessions.forEach(sess => {
+          const metricsHtml = sess.metrics ? sess.metrics.map(m => `<span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-semibold text-slate-600 dark:text-slate-300 mr-1">${m.metric_name}: <b>${m.metric_value}</b> ${m.metric_unit || ''}</span>`).join('') : '';
+          const probsHtml = sess.problems ? sess.problems.map(p => `<div class="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1">⚠️ Issue: ${p.description}</div>`).join('') : '';
+          
+          let ratingButtons = '';
+          for (let r = 1; r <= 10; r++) {
+            const isSelected = sess.coach_rating === r;
+            const bgBtn = isSelected ? 'bg-emerald-600 text-white font-extrabold shadow-sm scale-105' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50';
+            ratingButtons += `<button onclick="rateStudentSession(${sess.session_id}, ${r}, ${studentId})" class="w-7 h-7 rounded-lg text-xs transition transform ${bgBtn}">${r}</button>`;
+          }
 
-    if (!data.sessions || data.sessions.length === 0) {
-      sessContainer.innerHTML = `<p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">No sessions logged for ${data.coached_sport_filter}.</p>`;
-    } else {
-      data.sessions.forEach(sess => {
-        const metricsHtml = sess.metrics ? sess.metrics.map(m => `<span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-semibold text-slate-600 dark:text-slate-300 mr-1">${m.metric_name}: <b>${m.metric_value}</b> ${m.metric_unit}</span>`).join('') : '';
-        const probsHtml = sess.problems ? sess.problems.map(p => `<div class="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1">⚠️ Issue: ${p.description}</div>`).join('') : '';
-        
-        let ratingButtons = '';
-        for (let r = 1; r <= 10; r++) {
-          const isSelected = sess.coach_rating === r;
-          const bgBtn = isSelected ? 'bg-emerald-600 text-white font-extrabold shadow-sm scale-105' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50';
-          ratingButtons += `<button onclick="rateStudentSession(${sess.session_id}, ${r}, ${studentId})" class="w-7 h-7 rounded-lg text-xs transition transform ${bgBtn}">${r}</button>`;
-        }
-
-        sessContainer.innerHTML += `
-          <div class="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-sm">
-            <div class="flex items-center justify-between text-xs">
-              <div class="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2">
-                <span>📅 Date: ${sess.date}</span>
-                <span class="px-2 py-0.5 bg-brand-100 text-brand-800 dark:bg-brand-900/50 dark:text-brand-300 rounded font-bold">${sess.sport_name}</span>
+          sessContainer.innerHTML += `
+            <div class="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-sm">
+              <div class="flex items-center justify-between text-xs">
+                <div class="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <span>📅 Date: ${sess.date}</span>
+                  <span class="px-2 py-0.5 bg-brand-100 text-brand-800 dark:bg-brand-900/50 dark:text-brand-300 rounded font-bold">${sess.sport_name}</span>
+                </div>
+                <div class="text-slate-500 font-semibold">
+                  Current Coach Rating: <b class="${sess.coach_rating ? 'text-emerald-600 dark:text-emerald-400 font-extrabold' : 'text-amber-500'}">${sess.coach_rating ? sess.coach_rating + '/10' : 'Unrated'}</b>
+                </div>
               </div>
-              <div class="text-slate-500 font-semibold">
-                Current Coach Rating: <b class="${sess.coach_rating ? 'text-emerald-600 dark:text-emerald-400 font-extrabold' : 'text-amber-500'}">${sess.coach_rating ? sess.coach_rating + '/10' : 'Unrated'}</b>
+
+              <div class="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
+                <span>Duration: <b>${sess.duration_minutes}m</b></span>
+                <span>Intensity: <b>${sess.intensity}</b></span>
+                <span>Type: <b>${(sess.training_type || '').replace('_', ' ')}</b></span>
+              </div>
+
+              ${metricsHtml ? `<div class="pt-1">${metricsHtml}</div>` : ''}
+              ${probsHtml}
+
+              <!-- Coach Rating Generator Bar -->
+              <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between flex-wrap gap-2">
+                <span class="text-[11px] font-bold text-slate-500">Generate Coach Rating (1-10):</span>
+                <div class="flex space-x-1">${ratingButtons}</div>
               </div>
             </div>
-
-            <div class="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
-              <span>Duration: <b>${sess.duration_minutes}m</b></span>
-              <span>Intensity: <b>${sess.intensity}</b></span>
-              <span>Type: <b>${sess.training_type.replace('_', ' ')}</b></span>
-            </div>
-
-            ${metricsHtml ? `<div class="pt-1">${metricsHtml}</div>` : ''}
-            ${probsHtml}
-
-            <!-- Coach Rating Generator Bar -->
-            <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between flex-wrap gap-2">
-              <span class="text-[11px] font-bold text-slate-500">Generate Coach Rating (1-10):</span>
-              <div class="flex space-x-1">${ratingButtons}</div>
-            </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
     }
 
-    document.getElementById('coach-student-detail-modal').classList.remove('hidden');
+    const modal = document.getElementById('coach-student-detail-modal');
+    if (modal) modal.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
   } catch (err) {
     showToast(err.message, 'error');
@@ -2343,18 +2513,16 @@ async function openCoachStudentDetailModal(studentId) {
 }
 
 function closeCoachStudentDetailModal() {
-  document.getElementById('coach-student-detail-modal').classList.add('hidden');
+  const modal = document.getElementById('coach-student-detail-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 async function rateStudentSession(sessionId, rating, studentId) {
   try {
-    const res = await fetch(`/api/coach/sessions/${sessionId}/rate`, {
+    const data = await safeFetchJson(`/api/coach/sessions/${sessionId}/rate`, {
       method: 'POST',
-      headers: authHeaders(),
       body: JSON.stringify({ coach_rating: rating })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to update rating');
     showToast(`Coach Rating ${rating}/10 generated successfully!`, 'success');
     openCoachStudentDetailModal(studentId);
   } catch (err) {
@@ -2364,8 +2532,7 @@ async function rateStudentSession(sessionId, rating, studentId) {
 
 async function loadCoachRequests() {
   try {
-    const res = await fetch('/api/coach/requests', { headers: authHeaders() });
-    const requests = await res.json();
+    const requests = await safeFetchJson('/api/coach/requests');
     const container = document.getElementById('coach-requests-list');
     if (!container) return;
     container.innerHTML = '';
@@ -2375,76 +2542,73 @@ async function loadCoachRequests() {
       return;
     }
 
-    requests.forEach(r => {
-      let acceptBtnHtml = `<button onclick="respondRequest(${r.connection_id}, true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-sm">Accept</button>`;
-      let warningHtml = '';
-      if (r.is_eligible === false) {
-        acceptBtnHtml = `<button disabled title="${r.eligibility_warning || 'Ineligible student'}" class="px-3 py-1.5 bg-slate-300 dark:bg-slate-700 text-slate-500 font-bold rounded-lg text-xs cursor-not-allowed">Accept Locked</button>`;
-        warningHtml = `<div class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1">⚠️ ${r.eligibility_warning || 'Student is not registered in your specialized sport.'}</div>`;
-      }
+    requests.forEach(req => {
+      const lockWarning = req.eligibility_warning ? `
+        <div class="mt-2 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-300 text-[11px] font-medium flex items-center space-x-1.5">
+          <span>⚠️</span>
+          <span>${req.eligibility_warning}</span>
+        </div>
+      ` : '';
+
+      const buttonsHtml = req.is_eligible !== false ? `
+        <div class="flex items-center space-x-2">
+          <button onclick="respondCoachRequest(${req.connection_id}, true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-sm">Accept</button>
+          <button onclick="respondCoachRequest(${req.connection_id}, false)" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-sm">Reject</button>
+        </div>
+      ` : `
+        <button onclick="respondCoachRequest(${req.connection_id}, false)" class="px-3 py-1.5 bg-slate-500 hover:bg-slate-600 text-white font-bold rounded-lg text-xs shadow-sm">Reject Request</button>
+      `;
 
       container.innerHTML += `
-        <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 class="text-sm font-bold text-slate-900 dark:text-white">${r.student_name}</h3>
-            <div class="text-xs text-slate-500">${r.student_email} • Registered Sports: ${r.student_sports ? r.student_sports.join(', ') : (r.preferred_sport || 'N/A')}</div>
-            ${warningHtml}
+            <h4 class="font-bold text-sm text-slate-900 dark:text-white">${req.student_name}</h4>
+            <div class="text-xs text-slate-500">${req.student_email} • Sport: ${req.preferred_sport || 'N/A'}</div>
+            ${lockWarning}
           </div>
-          <div class="flex gap-2">
-            ${acceptBtnHtml}
-            <button onclick="respondRequest(${r.connection_id}, false)" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-sm">Reject</button>
-          </div>
+          <div>${buttonsHtml}</div>
         </div>
       `;
     });
   } catch (e) { console.error(e); }
 }
 
-async function respondRequest(connectionId, accept) {
-  try {
-    const res = await fetch(`/api/coach/requests/${connectionId}/respond?accept=${accept}`, {
-      method: 'POST',
-      headers: authHeaders()
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to respond to request');
-    showToast(data.message || `Request ${accept ? 'accepted' : 'rejected'}`);
-    loadCoachRequests();
-    loadCoachDashboard();
-  } catch (err) { showToast(err.message, 'error'); }
-}
-
-async function loadCoachStudents() {
-  try {
-    const res = await fetch('/api/coach/students', { headers: authHeaders() });
-    const students = await res.json();
-    const container = document.getElementById('coach-students-full-list');
-    renderCoachStudentCards(students, container);
-  } catch (e) { console.error(e); }
-}
-
 // COACH FEEDBACK MODAL
 async function openCoachFeedbackModal(studentId, studentName) {
-  document.getElementById('fb-student-id').value = studentId;
-  document.getElementById('feedback-student-name').textContent = `Submitting feedback for ${studentName}`;
+  const idEl = document.getElementById('fb-student-id');
+  if (idEl) idEl.value = studentId;
+
+  const nameEl = document.getElementById('feedback-student-name');
+  if (nameEl) nameEl.textContent = `Submitting feedback for ${studentName}`;
 
   try {
-    // Load student sports for select
-    const res = await fetch(`/api/coach/students/${studentId}`, { headers: authHeaders() });
-    const data = await res.json();
-
+    const data = await safeFetchJson(`/api/coach/students/${studentId}`);
     const select = document.getElementById('fb-sport-id');
-    select.innerHTML = '';
-    data.sports.forEach(s => {
-      select.innerHTML += `<option value="${s.sport_id}">${s.name}</option>`;
-    });
+    if (select) {
+      select.innerHTML = '';
+      if (data.sports && data.sports.length > 0) {
+        data.sports.forEach(s => {
+          select.innerHTML += `<option value="${s.sport_id}">${s.name || s.sport_name}</option>`;
+        });
+      } else if (data.sports_statistics && data.sports_statistics.length > 0) {
+        data.sports_statistics.forEach(s => {
+          select.innerHTML += `<option value="${s.sport_id}">${s.sport_name}</option>`;
+        });
+      } else {
+        select.innerHTML = '<option value="">No sport available</option>';
+      }
+    }
 
-    document.getElementById('coach-feedback-modal').classList.remove('hidden');
-  } catch (e) { console.error(e); }
+    const modal = document.getElementById('coach-feedback-modal');
+    if (modal) modal.classList.remove('hidden');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function closeCoachFeedbackModal() {
-  document.getElementById('coach-feedback-modal').classList.add('hidden');
+  const modal = document.getElementById('coach-feedback-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 async function submitCoachFeedback(e) {
@@ -2457,19 +2621,23 @@ async function submitCoachFeedback(e) {
   const recommended_drill = document.getElementById('fb-drill').value;
   const practice_duration_minutes = parseInt(document.getElementById('fb-duration').value) || 20;
 
+  if (!sport_id) {
+    showToast('Please select a valid sport for feedback', 'error');
+    return;
+  }
+
   try {
-    const res = await fetch('/api/coach/feedback', {
+    await safeFetchJson('/api/coach/feedback', {
       method: 'POST',
-      headers: authHeaders(),
       body: JSON.stringify({
         student_id, sport_id, observed_strength, observed_weakness,
         feedback_text, recommended_drill, practice_duration_minutes
       })
     });
-    if (!res.ok) throw new Error('Failed to submit coach feedback');
 
     closeCoachFeedbackModal();
     showToast('Coach feedback submitted successfully!', 'success');
+    loadCoachDashboard();
   } catch (err) { showToast(err.message, 'error'); }
 }
 
@@ -2536,9 +2704,8 @@ async function submitDrillSuggestionFromModal(e) {
   }
 
   try {
-    const res = await fetch('/api/coach/feedback', {
+    await safeFetchJson('/api/coach/feedback', {
       method: 'POST',
-      headers: authHeaders(),
       body: JSON.stringify({
         student_id,
         sport_id,
@@ -2552,18 +2719,14 @@ async function submitDrillSuggestionFromModal(e) {
       })
     });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'Failed to send drill suggestion');
-
     showToast('Drill performance suggestion sent to student successfully!', 'success');
     if (drillNameEl) drillNameEl.value = '';
     if (feedbackEl) feedbackEl.value = '';
     
     // Refresh modal details and coach students list
     openCoachStudentDetailModal(student_id);
-    if (typeof openCoachStudents === 'function') openCoachStudents();
+    loadCoachDashboard();
   } catch (err) {
-    console.error('Error submitting drill suggestion:', err);
     showToast(err.message || 'Failed to send drill suggestion', 'error');
   }
 }
