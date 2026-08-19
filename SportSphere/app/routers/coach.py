@@ -255,6 +255,8 @@ def get_connected_students(user: dict = Depends(require_coach)):
         for s in students:
             s["total_hours"] = round(s["total_minutes"] / 60.0, 1)
             s["total_practice_hours"] = s["total_hours"]
+            if spec:
+                s["preferred_sport"] = spec.capitalize()
         return students
 
 @router.get("/students/{student_id}")
@@ -314,7 +316,7 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
         # Get practice sessions for coached sports
         query_sessions = f"""
             SELECT ps.session_id, ps.sport_id, s.name as sport_name, ps.date, ps.duration_minutes,
-                   ps.intensity, ps.training_type, ps.coach_rating, ps.notes
+                   ps.intensity, ps.training_type, ps.training_area, ps.coach_rating, ps.notes
             FROM practice_sessions ps
             JOIN sports s ON ps.sport_id = s.sport_id
             WHERE ps.student_id = ? {sport_clause}
@@ -570,6 +572,24 @@ def get_student_feedback(sport_id: Optional[int] = Query(None), user: dict = Dep
     with db_session() as conn:
         cursor = conn.cursor()
         
+        if user["role"] == "COACH":
+            query = """
+                SELECT cf.feedback_id, cf.student_id, cf.sport_id, cf.observed_strength, cf.observed_weakness, cf.feedback_text,
+                       cf.recommended_drill, cf.practice_duration_minutes, cf.priority, cf.student_reply,
+                       cf.student_reply_at, cf.created_at, u.name as student_name, u.email as student_email, s.name as sport_name
+                FROM coach_feedback cf
+                JOIN users u ON cf.student_id = u.user_id
+                JOIN sports s ON cf.sport_id = s.sport_id
+                WHERE cf.coach_id = ?
+            """
+            params = [user["user_id"]]
+            if sport_id:
+                query += " AND cf.sport_id = ?"
+                params.append(sport_id)
+            query += " ORDER BY cf.created_at DESC"
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+
         target_student_id = user["user_id"]
         query = """
             SELECT cf.feedback_id, cf.sport_id, cf.observed_strength, cf.observed_weakness, cf.feedback_text,

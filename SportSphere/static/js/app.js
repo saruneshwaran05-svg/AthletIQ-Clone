@@ -3228,7 +3228,10 @@ async function respondRequestFromNotification(connectionId, accept) {
       method: 'POST',
       headers: authHeaders()
     });
-    if (!res.ok) throw new Error('Failed to respond to request');
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Failed to respond to request');
+    }
     showToast(`Connection request ${accept ? 'accepted' : 'rejected'} successfully!`, 'success');
     loadNotifications();
     if (typeof loadCoachDashboard === 'function') loadCoachDashboard();
@@ -3237,6 +3240,10 @@ async function respondRequestFromNotification(connectionId, accept) {
   } catch (err) {
     showToast(err.message, 'error');
   }
+}
+
+async function respondCoachRequest(connectionId, accept) {
+  await respondRequestFromNotification(connectionId, accept);
 }
 
 // SUBMIT COACH AI RECOMMENDATION ADVICE

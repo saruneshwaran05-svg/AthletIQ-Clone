@@ -105,7 +105,7 @@
       <div
         class="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 text-xs font-bold tracking-wide uppercase mb-6 border border-brand-200 dark:border-brand-800">
         <i data-lucide="sparkles" class="w-4 h-4 text-accent-500"></i>
-        <span>AI-Powered Sports Performance Platform</span>
+        <span>AI-Powered Sports Performance Tracking Platform</span>
       </div>
       <h1
         class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-4xl mx-auto leading-tight">
@@ -303,7 +303,8 @@
                 <div
                   class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-3 py-1.5 mb-1 border-b border-slate-800/80 flex items-center justify-between">
                   <span>Saved Logins</span>
-                  <button type="button" onclick="clearAllRememberedLogins()" class="text-[10px] text-rose-400 hover:text-rose-300 font-bold transition flex items-center space-x-1 cursor-pointer hover:bg-rose-950/40 px-2 py-0.5 rounded-md">
+                  <button type="button" onclick="clearAllRememberedLogins()"
+                    class="text-[10px] text-rose-400 hover:text-rose-300 font-bold transition flex items-center space-x-1 cursor-pointer hover:bg-rose-950/40 px-2 py-0.5 rounded-md">
                     <i data-lucide="trash-2" class="w-3 h-3"></i>
                     <span>Clear All</span>
                   </button>
@@ -1089,78 +1090,100 @@
         <!-- VIEW: COACH DASHBOARD -->
         <div id="view-coach-dashboard" class="hidden space-y-6">
           <!-- Coach Hero Welcome Banner -->
-          <div class="relative overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-500/20">
+          <div
+            class="relative overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-500/20">
             <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div class="space-y-2 max-w-2xl">
-                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold border border-white/20">
+                <div
+                  class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold border border-white/20">
                   <i data-lucide="award" class="w-4 h-4 text-emerald-300"></i>
                   <span id="coach-banner-spec">Certified Sports Specialist</span>
                 </div>
-                <h1 id="coach-dashboard-heading" class="text-2xl sm:text-3xl font-black tracking-tight">Coach Executive Hub</h1>
+                <h1 id="coach-dashboard-heading" class="text-2xl sm:text-3xl font-black tracking-tight">Coach Executive
+                  Hub</h1>
                 <p class="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
-                  Monitor student athlete progress, rate practice sessions, and provide targeted AI recommendations & professional drills.
+                  Monitor student athlete progress, rate practice sessions, and provide targeted AI recommendations &
+                  professional drills.
                 </p>
               </div>
 
               <!-- Quick Action Toolbar -->
               <div class="flex flex-wrap items-center gap-3">
-                <button onclick="navTo('coach-requests')" class="px-4 py-2.5 bg-white text-emerald-700 hover:bg-emerald-50 font-extrabold rounded-xl text-xs shadow-lg transition flex items-center space-x-2">
+                <button onclick="navTo('coach-requests')"
+                  class="px-4 py-2.5 bg-white text-emerald-700 hover:bg-emerald-50 font-extrabold rounded-xl text-xs shadow-lg transition flex items-center space-x-2">
                   <i data-lucide="user-check" class="w-4 h-4 text-emerald-600"></i>
                   <span>Review Requests</span>
-                  <span id="coach-banner-request-badge" class="ml-1 px-1.5 py-0.5 text-[10px] bg-emerald-600 text-white rounded-full hidden">0</span>
+                  <span id="coach-banner-request-badge"
+                    class="ml-1 px-1.5 py-0.5 text-[10px] bg-emerald-600 text-white rounded-full hidden">0</span>
                 </button>
-                <button onclick="navTo('coach-students')" class="px-4 py-2.5 bg-emerald-800/60 hover:bg-emerald-800/80 text-white font-extrabold rounded-xl text-xs border border-white/20 transition flex items-center space-x-2">
+                <button onclick="navTo('coach-students')"
+                  class="px-4 py-2.5 bg-emerald-800/60 hover:bg-emerald-800/80 text-white font-extrabold rounded-xl text-xs border border-white/20 transition flex items-center space-x-2">
                   <i data-lucide="users" class="w-4 h-4"></i>
                   <span>My Athletes</span>
                 </button>
               </div>
             </div>
             <!-- Background Glow Elements -->
-            <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none">
+            </div>
           </div>
 
           <!-- Coach Executive Analytics Stat Cards -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+            <div
+              class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
               <div>
-                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supervised Athletes</div>
+                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supervised
+                  Athletes</div>
                 <div class="text-2xl font-black text-slate-900 dark:text-white mt-1" id="coach-card-students">0</div>
                 <div class="text-[11px] text-emerald-600 font-semibold mt-0.5">Connected & Active</div>
               </div>
-              <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center">
                 <i data-lucide="users" class="w-6 h-6"></i>
               </div>
             </div>
 
-            <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+            <div
+              class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
               <div>
-                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending Requests</div>
+                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending
+                  Requests</div>
                 <div class="text-2xl font-black text-accent-500 mt-1" id="coach-card-pending">0</div>
                 <div class="text-[11px] text-slate-400 font-medium mt-0.5">Awaiting Action</div>
               </div>
-              <div class="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center">
                 <i data-lucide="clock" class="w-6 h-6"></i>
               </div>
             </div>
 
-            <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+            <div
+              class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
               <div>
-                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recent Workouts</div>
-                <div class="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1" id="coach-card-recent-sessions">0</div>
+                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recent
+                  Workouts</div>
+                <div class="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1"
+                  id="coach-card-recent-sessions">0</div>
                 <div class="text-[11px] text-indigo-500 font-medium mt-0.5">Logged Last 7 Days</div>
               </div>
-              <div class="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 flex items-center justify-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 flex items-center justify-center">
                 <i data-lucide="activity" class="w-6 h-6"></i>
               </div>
             </div>
 
-            <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+            <div
+              class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
               <div>
-                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Drills Assigned</div>
-                <div class="text-2xl font-black text-brand-600 dark:text-brand-400 mt-1" id="coach-card-drills-given">0</div>
+                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Drills
+                  Assigned</div>
+                <div class="text-2xl font-black text-brand-600 dark:text-brand-400 mt-1" id="coach-card-drills-given">0
+                </div>
                 <div class="text-[11px] text-brand-500 font-medium mt-0.5">Feedback & Drills Submitted</div>
               </div>
-              <div class="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 flex items-center justify-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 flex items-center justify-center">
                 <i data-lucide="target" class="w-6 h-6"></i>
               </div>
             </div>
@@ -1173,7 +1196,8 @@
                 <i data-lucide="user-check" class="w-5 h-5 text-emerald-600"></i>
                 <span>Connected Student Athletes</span>
               </h2>
-              <button onclick="navTo('coach-students')" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center space-x-1">
+              <button onclick="navTo('coach-students')"
+                class="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center space-x-1">
                 <span>View All Athletes</span>
                 <i data-lucide="chevron-right" class="w-4 h-4"></i>
               </button>
@@ -1181,7 +1205,8 @@
 
             <div id="coach-dash-empty" class="empty-state-box">
               <h3 class="text-lg font-bold text-slate-900 dark:text-white">No students connected yet</h3>
-              <p class="text-xs text-slate-500 mt-2">When students send you connection requests, accept them to view practice sessions and attach targeted AI recommendations.</p>
+              <p class="text-xs text-slate-500 mt-2">When students send you connection requests, accept them to view
+                practice sessions and attach targeted AI recommendations.</p>
             </div>
 
             <div id="coach-students-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -1195,7 +1220,8 @@
                   <i data-lucide="zap" class="w-5 h-5 text-amber-500"></i>
                   <span>Recent Student Practice Sessions Feed</span>
                 </h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Review workouts logged by your athletes, rate session performance, and attach drill advice.</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Review workouts logged by your athletes, rate
+                  session performance, and attach drill advice.</p>
               </div>
             </div>
 
@@ -1403,19 +1429,23 @@
 
       <!-- Interactive Modal Tab Bar -->
       <div class="flex items-center space-x-1 border-b border-slate-200 dark:border-slate-700 pb-2 overflow-x-auto">
-        <button type="button" onclick="switchCsdTab('ratings')" id="csd-btn-ratings" class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-emerald-600 text-white shadow-sm">
+        <button type="button" onclick="switchCsdTab('ratings')" id="csd-btn-ratings"
+          class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-emerald-600 text-white shadow-sm">
           <i data-lucide="star" class="w-3.5 h-3.5"></i>
           <span>Ratings & Sessions</span>
         </button>
-        <button type="button" onclick="switchCsdTab('ai')" id="csd-btn-ai" class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
+        <button type="button" onclick="switchCsdTab('ai')" id="csd-btn-ai"
+          class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
           <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
           <span>AI Insights & Advice</span>
         </button>
-        <button type="button" onclick="switchCsdTab('feedback')" id="csd-btn-feedback" class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
+        <button type="button" onclick="switchCsdTab('feedback')" id="csd-btn-feedback"
+          class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
           <i data-lucide="award" class="w-3.5 h-3.5 text-sportsgreen-500"></i>
           <span>Drill Feedback</span>
         </button>
-        <button type="button" onclick="switchCsdTab('stats')" id="csd-btn-stats" class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
+        <button type="button" onclick="switchCsdTab('stats')" id="csd-btn-stats"
+          class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
           <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-indigo-500"></i>
           <span>Sport Stats</span>
         </button>
@@ -1423,7 +1453,8 @@
 
       <!-- TAB 1: SESSION RATINGS & PRACTICE FEED -->
       <div id="csd-panel-ratings" class="space-y-3">
-        <h3 class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
+        <h3
+          class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
           <i data-lucide="calendar" class="w-4 h-4 text-emerald-600"></i>
           <span>Session-Wise Analytics & Performance Rating Generator</span>
         </h3>
@@ -1432,7 +1463,8 @@
 
       <!-- TAB 2: AI INSIGHTS & ADVICE -->
       <div id="csd-panel-ai" class="hidden space-y-3">
-        <h3 class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
+        <h3
+          class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
           <i data-lucide="sparkles" class="w-4 h-4 text-accent-500"></i>
           <span>Coached Sport AI Analytics & Recommendation Advice</span>
         </h3>
@@ -1441,47 +1473,61 @@
 
       <!-- TAB 3: DRILL FEEDBACK & ASSIGNMENT -->
       <div id="csd-panel-feedback" class="hidden space-y-3">
-        <h3 class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
+        <h3
+          class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
           <i data-lucide="award" class="w-4 h-4 text-sportsgreen-600"></i>
           <span>Assign Drill Performance Suggestion</span>
         </h3>
-        <form onsubmit="submitDrillSuggestionFromModal(event)" class="bg-slate-50 dark:bg-slate-700/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+        <form onsubmit="submitDrillSuggestionFromModal(event)"
+          class="bg-slate-50 dark:bg-slate-700/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
           <input type="hidden" id="csd-student-id">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Sport *</label>
-              <select id="csd-sport-select" required class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"></select>
+              <select id="csd-sport-select" required
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"></select>
             </div>
             <div>
-              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Target Session (Optional)</label>
-              <select id="csd-session-select" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
+              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Target Session
+                (Optional)</label>
+              <select id="csd-session-select"
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
                 <option value="">All Sessions (General Drill)</option>
               </select>
             </div>
             <div>
-              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Recommended Drill Name *</label>
-              <input type="text" id="csd-drill-name" required placeholder="e.g. Target Line Bowling / Free Throw Reps" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
+              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Recommended Drill
+                Name *</label>
+              <input type="text" id="csd-drill-name" required placeholder="e.g. Target Line Bowling / Free Throw Reps"
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
             </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Drill Performance Suggestions *</label>
-            <textarea id="csd-feedback-text" required rows="2" placeholder="Based on your drill metrics, focus on consistent pace..." class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"></textarea>
+            <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Drill Performance
+              Suggestions *</label>
+            <textarea id="csd-feedback-text" required rows="2"
+              placeholder="Based on your drill metrics, focus on consistent pace..."
+              class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Target Duration (Mins)</label>
-              <input type="number" id="csd-drill-duration" value="25" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
+              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Target Duration
+                (Mins)</label>
+              <input type="number" id="csd-drill-duration" value="25"
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
             </div>
             <div>
               <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Priority</label>
-              <select id="csd-priority" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
+              <select id="csd-priority"
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs">
                 <option value="HIGH">High Priority</option>
                 <option value="MEDIUM" selected>Medium Priority</option>
                 <option value="LOW">Low Priority</option>
               </select>
             </div>
           </div>
-          <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs transition shadow-sm">
+          <button type="submit"
+            class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs transition shadow-sm">
             Send Drill Suggestion to Student
           </button>
         </form>
@@ -1489,7 +1535,8 @@
 
       <!-- TAB 4: SPORT PERFORMANCE STATS -->
       <div id="csd-panel-stats" class="hidden space-y-3">
-        <h3 class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
+        <h3
+          class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-1.5">
           <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
           <span>Per-Sport Statistics & Metric Breakdown</span>
         </h3>

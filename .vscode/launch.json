@@ -2,13 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Chrome",
-            "request": "launch",
-            "type": "chrome",
-            "url": "http://localhost:8080",
-            "webRoot": "${workspaceFolder}"
-        },
-        {
             "name": "⚡ Run AthletIQ Server (http://127.0.0.1:8000)",
             "type": "python",
             "request": "launch",
@@ -16,9 +9,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/SportSphere;${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}/SportSphere;${workspaceFolder}",
+                "PYDEVD_DISABLE_FILE_VALIDATION": "1"
             },
-            "subProcess": true
+            "subProcess": false,
+            "justMyCode": true
         },
         {
             "name": "🌐 Open Chrome Browser (http://127.0.0.1:8000)",
@@ -28,11 +23,24 @@
             "webRoot": "${workspaceFolder}/SportSphere"
         },
         {
-            "name": "Python Debugger: Current File",
+            "name": "🐍 Python Debugger: Uvicorn Direct",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "module": "uvicorn",
+            "args": [
+                "app.main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "cwd": "${workspaceFolder}/SportSphere",
+            "console": "integratedTerminal",
+            "env": {
+                "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+            },
+            "subProcess": false
         }
     ],
     "compounds": [
