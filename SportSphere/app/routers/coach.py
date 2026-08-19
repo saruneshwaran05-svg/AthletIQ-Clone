@@ -219,19 +219,42 @@ def respond_connection_request(connection_id: int, accept: bool, user: dict = De
 def get_connected_students(user: dict = Depends(require_coach)):
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT cc.connection_id, cc.student_id, u.name as student_name, u.email as student_email,
-                   u.preferred_sport, u.profile_photo, cc.created_at,
-                   (SELECT COUNT(*) FROM practice_sessions ps WHERE ps.student_id = u.user_id) as total_sessions,
-                   (SELECT COALESCE(SUM(duration_minutes), 0) FROM practice_sessions ps WHERE ps.student_id = u.user_id) as total_minutes
-            FROM coach_connections cc
-            JOIN users u ON cc.student_id = u.user_id
-            WHERE cc.coach_id = ? AND cc.status = 'ACCEPTED'
-            ORDER BY cc.created_at DESC
-        """, (user["user_id"],))
+        spec = _get_coach_spec(cursor, user["user_id"])
+        
+        if spec:
+            sport_clause = " JOIN sports s ON ps.sport_id = s.sport_id WHERE ps.student_id = u.user_id AND (LOWER(s.name) LIKE ? OR LOWER(?) LIKE '%' || LOWER(s.name) || '%')"
+            sport_params = [f"%{spec}%", spec]
+            
+            cursor.execute(f"""
+                SELECT cc.connection_id, cc.student_id, u.user_id,
+                       u.name as student_name, u.email as student_email,
+                       u.name, u.email,
+                       u.preferred_sport, u.profile_photo, cc.created_at,
+                       (SELECT COUNT(*) FROM practice_sessions ps {sport_clause}) as total_sessions,
+                       (SELECT COALESCE(SUM(ps.duration_minutes), 0) FROM practice_sessions ps {sport_clause}) as total_minutes
+                FROM coach_connections cc
+                JOIN users u ON cc.student_id = u.user_id
+                WHERE cc.coach_id = ? AND cc.status = 'ACCEPTED'
+                ORDER BY cc.created_at DESC
+            """, sport_params + sport_params + [user["user_id"]])
+        else:
+            cursor.execute("""
+                SELECT cc.connection_id, cc.student_id, u.user_id,
+                       u.name as student_name, u.email as student_email,
+                       u.name, u.email,
+                       u.preferred_sport, u.profile_photo, cc.created_at,
+                       (SELECT COUNT(*) FROM practice_sessions ps WHERE ps.student_id = u.user_id) as total_sessions,
+                       (SELECT COALESCE(SUM(ps.duration_minutes), 0) FROM practice_sessions ps WHERE ps.student_id = u.user_id) as total_minutes
+                FROM coach_connections cc
+                JOIN users u ON cc.student_id = u.user_id
+                WHERE cc.coach_id = ? AND cc.status = 'ACCEPTED'
+                ORDER BY cc.created_at DESC
+            """, (user["user_id"],))
+            
         students = [dict(r) for r in cursor.fetchall()]
         for s in students:
             s["total_hours"] = round(s["total_minutes"] / 60.0, 1)
+            s["total_practice_hours"] = s["total_hours"]
         return students
 
 @router.get("/students/{student_id}")
@@ -346,8 +369,8 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
         cursor.execute(query_fb, [student_id, user["user_id"]] + sport_params)
         coach_feedbacks = [dict(r) for r in cursor.fetchall()]
 
-        # Compute per-sport statistics for the student
-        cursor.execute("""
+        # Compute per-sport statistics for the student (filtered by coach specialization if defined)
+        query_per_sport = f"""
             SELECT DISTINCT s.sport_id, s.name as sport_name, s.category, ss.skill_level, ss.experience_years, ss.training_goal
             FROM sports s
             LEFT JOIN student_sports ss ON s.sport_id = ss.sport_id AND ss.student_id = ?
@@ -355,10 +378,10 @@ def get_coach_student_detail(student_id: int, user: dict = Depends(require_coach
                 SELECT sport_id FROM student_sports WHERE student_id = ?
                 UNION
                 SELECT sport_id FROM practice_sessions WHERE student_id = ?
-            )
+            ) {sport_clause}
             ORDER BY s.name ASC
-        """, (student_id, student_id, student_id))
-        
+        """
+        cursor.execute(query_per_sport, [student_id, student_id, student_id] + sport_params)
         all_sports_rows = [dict(r) for r in cursor.fetchall()]
         sports_statistics = []
         for sp in all_sports_rows:
@@ -486,6 +509,11 @@ def rate_student_session(session_id: int, req: SessionRatingInput, user: dict = 
         if not cursor.fetchone():
             raise HTTPException(status_code=403, detail="Access denied. You can only rate sessions for connected students.")
 
+        # Verify coach specialization eligibility
+        spec = _get_coach_spec(cursor, user["user_id"])
+        if spec and not (spec.lower() in sess["sport_name"].lower() or sess["sport_name"].lower() in spec.lower()):
+            raise HTTPException(status_code=403, detail=f"Access denied. As a {user.get('coaching_specialization', 'specialized')} Coach, you can only rate {spec.capitalize()} practice sessions.")
+
         # Update coach rating
         cursor.execute("UPDATE practice_sessions SET coach_rating = ? WHERE session_id = ?", (req.coach_rating, session_id))
 
@@ -510,6 +538,14 @@ def add_coach_feedback(req: CoachFeedbackCreate, user: dict = Depends(require_co
         cursor.execute("SELECT connection_id FROM coach_connections WHERE coach_id = ? AND student_id = ? AND status = 'ACCEPTED'", (user["user_id"], req.student_id))
         if not cursor.fetchone():
             raise HTTPException(status_code=403, detail="You can only provide feedback to connected students.")
+
+        # Verify coach specialization eligibility
+        spec = _get_coach_spec(cursor, user["user_id"])
+        if spec:
+            cursor.execute("SELECT name FROM sports WHERE sport_id = ?", (req.sport_id,))
+            sp_row = cursor.fetchone()
+            if sp_row and not (spec.lower() in sp_row["name"].lower() or sp_row["name"].lower() in spec.lower()):
+                raise HTTPException(status_code=403, detail=f"Access denied. As a {user.get('coaching_specialization', 'specialized')} Coach, you can only provide feedback for {spec.capitalize()}.")
             
         cursor.execute("""
             INSERT INTO coach_feedback

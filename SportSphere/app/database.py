@@ -8,6 +8,19 @@ if db_dir and not os.path.exists(db_dir):
     os.makedirs(db_dir, exist_ok=True)
 
 
+def delete_database_files():
+    """Completely removes main SQLite database and WAL journal files (-wal, -shm)."""
+    for ext in ["", "-wal", "-shm"]:
+        target_path = DB_PATH + ext
+        if os.path.exists(target_path):
+            try:
+                os.remove(target_path)
+                print(f"Deleted database file: {target_path}")
+            except Exception as e:
+                print(f"Warning: Could not remove {target_path}: {e}")
+
+
+
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
@@ -163,12 +176,26 @@ def init_db():
             recommendation_text TEXT NOT NULL,
             suggested_goal TEXT,
             priority TEXT DEFAULT 'MEDIUM',
+            coach_suggestion TEXT,
+            coach_suggested_at TIMESTAMP,
+            coach_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE,
             FOREIGN KEY (sport_id) REFERENCES sports(sport_id) ON DELETE CASCADE,
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
+            FOREIGN KEY (coach_id) REFERENCES users(user_id) ON DELETE SET NULL
         );
         """)
+
+        # Auto-migrate existing ai_recommendations table
+        cursor.execute("PRAGMA table_info(ai_recommendations);")
+        air_columns = [row[1] for row in cursor.fetchall()]
+        if 'coach_suggestion' not in air_columns:
+            cursor.execute("ALTER TABLE ai_recommendations ADD COLUMN coach_suggestion TEXT;")
+        if 'coach_suggested_at' not in air_columns:
+            cursor.execute("ALTER TABLE ai_recommendations ADD COLUMN coach_suggested_at TIMESTAMP;")
+        if 'coach_id' not in air_columns:
+            cursor.execute("ALTER TABLE ai_recommendations ADD COLUMN coach_id INTEGER;")
 
         # 9. Coach-Student Connections
         cursor.execute("""

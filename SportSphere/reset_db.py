@@ -4,15 +4,23 @@ import sys
 # Ensure app package is in python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.database import init_db, clear_all_data, db_session
+from app.database import init_db, clear_all_data, db_session, delete_database_files
 from app.auth import hash_password
 from app.ai_engine import run_student_ai_analysis
 
-def reset_and_seed():
-    print("Initializing Database and clearing existing data...")
+def reset_database(seed_demo_data: bool = True):
+    print("Deleting old database and WAL journal files...")
+    delete_database_files()
+
+    print("Initializing clean schema and default sports...")
     init_db()
     clear_all_data()
 
+    if not seed_demo_data:
+        print("Database cleanly reset! 0 user accounts present. Ready for new user registrations.")
+        return
+
+    print("Seeding demo Student (sarun@gmail.com) and Coach (arun@gmail.com)...")
     with db_session() as conn:
         cursor = conn.cursor()
 
@@ -49,7 +57,7 @@ def reset_and_seed():
             VALUES (?, ?, 'ACCEPTED')
         """, (student_id, coach_id))
 
-        # Add 3 initial practice sessions for sarun@gmail.com so AI Analytics has solid trend data
+        # Add initial practice sessions
         sessions_data = [
             {
                 "date": "2026-08-10",
@@ -107,10 +115,12 @@ def reset_and_seed():
 
         print("Created clean Student (sarun@gmail.com) and Coach (arun@gmail.com) with 3 practice sessions!")
 
-    # 3. Generate AI Analytics for student
+    # Generate AI Analytics for student
     res = run_student_ai_analysis(student_id, cricket_id)
     print("AI Engine initialized analytics successfully:", res["message"])
     print("Reset and seeding completed clean!")
 
 if __name__ == "__main__":
-    reset_and_seed()
+    is_clean = "--clean" in sys.argv or "--empty" in sys.argv
+    reset_database(seed_demo_data=not is_clean)
+

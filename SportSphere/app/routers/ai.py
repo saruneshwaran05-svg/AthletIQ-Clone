@@ -57,9 +57,12 @@ def get_ai_recommendations(sport_id: Optional[int] = Query(None), session_id: Op
             query = f"""
                 SELECT ar.recommendation_id, ar.sport_id, ar.session_id, ar.title, ar.detected_issue, ar.evidence, 
                        ar.recommendation_text, ar.suggested_goal, ar.priority, ar.created_at,
+                       ar.coach_suggestion, ar.coach_suggested_at, ar.coach_id,
+                       u.name as coach_name, u.profile_photo as coach_photo,
                        s.name as sport_name, s.category as sport_category
                 FROM ai_recommendations ar
                 JOIN sports s ON ar.sport_id = s.sport_id
+                LEFT JOIN users u ON ar.coach_id = u.user_id
                 WHERE ar.student_id = ? AND ar.session_id = ? {coach_clause}
                 ORDER BY ar.created_at DESC, ar.priority ASC
             """
@@ -68,9 +71,12 @@ def get_ai_recommendations(sport_id: Optional[int] = Query(None), session_id: Op
             query = f"""
                 SELECT ar.recommendation_id, ar.sport_id, ar.session_id, ar.title, ar.detected_issue, ar.evidence, 
                        ar.recommendation_text, ar.suggested_goal, ar.priority, ar.created_at,
+                       ar.coach_suggestion, ar.coach_suggested_at, ar.coach_id,
+                       u.name as coach_name, u.profile_photo as coach_photo,
                        s.name as sport_name, s.category as sport_category
                 FROM ai_recommendations ar
                 JOIN sports s ON ar.sport_id = s.sport_id
+                LEFT JOIN users u ON ar.coach_id = u.user_id
                 WHERE ar.student_id = ? AND ar.sport_id = ? {coach_clause}
                 ORDER BY ar.created_at DESC, ar.priority ASC
             """
@@ -79,9 +85,12 @@ def get_ai_recommendations(sport_id: Optional[int] = Query(None), session_id: Op
             query = f"""
                 SELECT ar.recommendation_id, ar.sport_id, ar.session_id, ar.title, ar.detected_issue, ar.evidence, 
                        ar.recommendation_text, ar.suggested_goal, ar.priority, ar.created_at,
+                       ar.coach_suggestion, ar.coach_suggested_at, ar.coach_id,
+                       u.name as coach_name, u.profile_photo as coach_photo,
                        s.name as sport_name, s.category as sport_category
                 FROM ai_recommendations ar
                 JOIN sports s ON ar.sport_id = s.sport_id
+                LEFT JOIN users u ON ar.coach_id = u.user_id
                 WHERE ar.student_id = ? {coach_clause}
                 ORDER BY s.name ASC, ar.priority ASC, ar.created_at DESC
             """
@@ -99,6 +108,42 @@ def get_ai_recommendations(sport_id: Optional[int] = Query(None), session_id: Op
                 unique_recs.append(r)
 
         return unique_recs
+
+from app.schemas import CoachAiSuggestionInput
+from app.auth import require_coach
+from fastapi import HTTPException
+
+@router.post("/recommendations/{recommendation_id}/coach-suggestion")
+def add_coach_ai_suggestion(recommendation_id: int, req: CoachAiSuggestionInput, user: dict = Depends(require_coach)):
+    with db_session() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT recommendation_id, student_id, title FROM ai_recommendations WHERE recommendation_id = ?", (recommendation_id,))
+        rec = cursor.fetchone()
+        if not rec:
+            raise HTTPException(status_code=404, detail="AI Recommendation not found")
+        rec = dict(rec)
+
+        cursor.execute("SELECT connection_id FROM coach_connections WHERE coach_id = ? AND student_id = ? AND status = 'ACCEPTED'", (user["user_id"], rec["student_id"]))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=403, detail="Access denied. You can only provide suggestions for connected students.")
+
+        cursor.execute("""
+            UPDATE ai_recommendations 
+            SET coach_suggestion = ?, coach_suggested_at = CURRENT_TIMESTAMP, coach_id = ?
+            WHERE recommendation_id = ?
+        """, (req.coach_suggestion, user["user_id"], recommendation_id))
+
+        cursor.execute("""
+            INSERT INTO notifications (user_id, title, message, type)
+            VALUES (?, 'Coach Added Suggestion to AI Finding', ?, 'COACH_SUGGESTION')
+        """, (rec["student_id"], f"Coach {user['name']} added personalized guidance on AI recommendation '{rec['title']}'."))
+
+        return {
+            "message": "Coach suggestion attached to AI recommendation successfully",
+            "coach_suggestion": req.coach_suggestion,
+            "coach_name": user["name"]
+        }
 
 @router.get("/analyses")
 def get_ai_analyses(sport_id: Optional[int] = Query(None), student_id: Optional[int] = Query(None), user: dict = Depends(get_current_user)):

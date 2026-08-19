@@ -37,15 +37,27 @@ function applyTheme(isDark) {
   if (window.lucide) lucide.createIcons();
 }
 
-function initApp() {
+async function initApp() {
   currentToken = localStorage.getItem('athletiq_token') || sessionStorage.getItem('athletiq_token');
   const userStr = localStorage.getItem('athletiq_user') || sessionStorage.getItem('athletiq_user');
   
   if (currentToken && userStr) {
     try {
-      currentUser = JSON.parse(userStr);
-      showAppWorkspace();
+      const res = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const liveUser = await res.json();
+        currentUser = liveUser;
+        const storage = localStorage.getItem('athletiq_token') ? localStorage : sessionStorage;
+        storage.setItem('athletiq_user', JSON.stringify(liveUser));
+        showAppWorkspace();
+      } else {
+        console.warn('Stored session is invalid or user account no longer exists in DB. Logging out.');
+        handleLogout();
+      }
     } catch (e) {
+      console.warn('Session verification error:', e);
       handleLogout();
     }
   } else {
@@ -613,9 +625,15 @@ function setRegisterRole(role) {
 async function handleLogin(e) {
   e.preventDefault();
   hideAuthErrors();
-  const email = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
+  const rawEmail = document.getElementById('login-email').value || '';
+  const email = rawEmail.trim();
+  const password = document.getElementById('login-password').value || '';
   const rememberMe = document.getElementById('login-remember-me')?.checked || false;
+
+  localStorage.removeItem('athletiq_token');
+  localStorage.removeItem('athletiq_user');
+  sessionStorage.removeItem('athletiq_token');
+  sessionStorage.removeItem('athletiq_user');
 
   try {
     const res = await fetch('/api/auth/login', {
@@ -647,6 +665,9 @@ async function handleLogin(e) {
     showToast(`Logged in successfully as ${data.user.role}`, 'success');
     showAppWorkspace();
   } catch (err) {
+    if (email) {
+      deleteSingleRememberedLogin(email);
+    }
     const loginAlert = document.getElementById('login-error-alert');
     const loginText = document.getElementById('login-error-text');
     if (loginAlert && loginText) {
@@ -658,14 +679,72 @@ async function handleLogin(e) {
   }
 }
 
+async function openForgotPassword() {
+  const emailInput = document.getElementById('login-email')?.value || '';
+  if (window.Swal) {
+    const { value: email } = await Swal.fire({
+      title: 'Reset Password',
+      text: 'Enter your registered email address to reset your password:',
+      input: 'email',
+      inputValue: emailInput,
+      inputPlaceholder: 'user@example.com',
+      showCancelButton: true,
+      confirmButtonText: 'Reset Password',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#64748b'
+    });
+
+    if (!email) return;
+
+    try {
+      const data = await safeFetchJson('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+      Swal.fire({
+        icon: 'success',
+        title: 'Password Reset',
+        text: data.message || 'Password has been reset to: password123',
+        confirmButtonColor: '#2563eb'
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Reset Failed',
+        text: err.message || 'Account with this email does not exist',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  } else {
+    const email = prompt('Enter your registered email address to reset your password:', emailInput);
+    if (!email) return;
+    try {
+      const data = await safeFetchJson('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+      alert(data.message || 'Password reset successfully');
+    } catch (err) {
+      alert(err.message || 'Reset failed');
+    }
+  }
+}
+
 async function handleRegister(e) {
   e.preventDefault();
   hideAuthErrors();
-  const name = document.getElementById('reg-name').value;
-  const email = document.getElementById('reg-email').value;
-  const password = document.getElementById('reg-password').value;
-  const confirmPassword = document.getElementById('reg-confirm-password').value;
+  const rawName = document.getElementById('reg-name').value || '';
+  const name = rawName.trim();
+  const rawEmail = document.getElementById('reg-email').value || '';
+  const email = rawEmail.trim();
+  const password = document.getElementById('reg-password').value || '';
+  const confirmPassword = document.getElementById('reg-confirm-password').value || '';
   const rememberMe = document.getElementById('reg-remember-me')?.checked || false;
+
+  localStorage.removeItem('athletiq_token');
+  localStorage.removeItem('athletiq_user');
+  sessionStorage.removeItem('athletiq_token');
+  sessionStorage.removeItem('athletiq_user');
 
   if (password !== confirmPassword) {
     const regAlert = document.getElementById('register-error-alert');
@@ -755,6 +834,14 @@ async function safeFetchJson(url, options = {}) {
   const reqHeaders = Object.assign({}, authHeaders(), options.headers || {});
   const config = Object.assign({}, options, { headers: reqHeaders });
   const res = await fetch(url, config);
+
+  if (res.status === 401 && !url.includes('/api/auth/login')) {
+    console.warn('Received 401 Unauthorized from server. Expired session or user account missing.');
+    handleLogout();
+    showToast('Session expired or account no longer exists. Please log in again.', 'warning');
+    throw new Error('Session expired or user account missing');
+  }
+
   const contentType = res.headers.get('content-type') || '';
   let data = {};
   if (contentType.includes('application/json')) {
@@ -767,10 +854,21 @@ async function safeFetchJson(url, options = {}) {
     return { text };
   }
   if (!res.ok) {
-    throw new Error(data.detail || data.message || `Request failed with status ${res.status}`);
+    let msg = 'Request failed';
+    if (typeof data.detail === 'string') {
+      msg = data.detail;
+    } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+      msg = data.detail.map(d => (d.msg || d.detail || JSON.stringify(d))).join(', ');
+    } else if (data.message) {
+      msg = data.message;
+    } else {
+      msg = `Server Error (${res.status})`;
+    }
+    throw new Error(msg);
   }
   return data;
 }
+
 
 // STUDENT DASHBOARD
 async function loadStudentDashboard(sportId = null) {
@@ -1835,7 +1933,7 @@ async function loadAIRecommendations(selectedSportId = null) {
   try {
     // 1. Fetch sports with logged practice sessions
     const sportsRes = await fetch('/api/ai/sports', { headers: authHeaders() });
-    const sportsList = await sportsRes.json();
+    const sportsList = sportsRes.ok ? await sportsRes.json() : [];
 
     // 2. Fetch AI Recommendations, Analyses & Session-wise Analytics
     let recsUrl = '/api/ai/recommendations';
@@ -2011,6 +2109,45 @@ async function loadAIRecommendations(selectedSportId = null) {
           `;
         }
 
+        let coachAdviceSection = '';
+        if (r.coach_suggestion) {
+          coachAdviceSection = `
+            <div class="mt-3 p-3.5 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800/60 text-xs space-y-1.5 shadow-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[10px]">🧑‍🏫</span>
+                  <span class="font-extrabold text-emerald-800 dark:text-emerald-300">Coach ${r.coach_name || 'Coach'}'s Direct Advice</span>
+                </div>
+                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">${new Date(r.coach_suggested_at || Date.now()).toLocaleDateString()}</span>
+              </div>
+              <p class="text-slate-800 dark:text-slate-200 font-medium leading-relaxed pl-8">
+                "${r.coach_suggestion}"
+              </p>
+            </div>
+          `;
+        }
+
+        let coachInputSection = '';
+        if (currentUser && currentUser.role === 'COACH') {
+          coachInputSection = `
+            <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-2">
+              <label class="block text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                ✍️ Attach Coach Advice on this AI Recommendation:
+              </label>
+              <div class="flex gap-2">
+                <input type="text" id="coach-ai-input-${r.recommendation_id}" 
+                  placeholder="${r.coach_suggestion ? 'Update your coach advice...' : 'Enter your specific coaching advice on this recommendation...'}" 
+                  value="${r.coach_suggestion || ''}"
+                  class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500">
+                <button onclick="submitCoachAiSuggestion(${r.recommendation_id})" 
+                  class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-sm transition flex items-center space-x-1">
+                  <span>${r.coach_suggestion ? 'Update' : 'Post Advice'}</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
         recsHtml += `
           <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition space-y-3">
             <div class="flex items-center justify-between gap-2">
@@ -2029,7 +2166,7 @@ async function loadAIRecommendations(selectedSportId = null) {
             </div>
 
             <div class="bg-slate-50 dark:bg-slate-700/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
-              <b class="text-brand-600 dark:text-brand-400 font-bold block mb-1">🎯 Actionable Coaching Routine:</b>
+              <b class="text-brand-600 dark:text-brand-400 font-bold block mb-1">🎯 Actionable AI Routine:</b>
               ${formatAiText(r.recommendation_text)}
             </div>
 
@@ -2046,9 +2183,12 @@ async function loadAIRecommendations(selectedSportId = null) {
               ` : ''}
             </div>
 
+            ${coachAdviceSection}
+            ${coachInputSection}
+
             <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
               ${goalBtnHtml}
-              <span class="text-[10px] text-slate-400">Auto-Tracked Goal</span>
+              <span class="text-[10px] text-slate-400">AI-Guided Action</span>
             </div>
           </div>
         `;
@@ -2343,8 +2483,93 @@ function renderCoachStudentCards(students, container) {
   });
 }
 
+function switchCsdTab(tabName) {
+  const tabs = ['ratings', 'ai', 'feedback', 'stats'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`csd-btn-${t}`);
+    const panel = document.getElementById(`csd-panel-${t}`);
+    if (btn && panel) {
+      if (t === tabName) {
+        btn.className = 'px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-emerald-600 text-white shadow-sm';
+        panel.classList.remove('hidden');
+      } else {
+        btn.className = 'px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600';
+        panel.classList.add('hidden');
+      }
+    }
+  });
+}
+
+async function loadCoachStudents() {
+  if (!currentUser || currentUser.role !== 'COACH') return;
+
+  try {
+    const studentsData = await safeFetchJson('/api/coach/students');
+    const students = Array.isArray(studentsData) ? studentsData : [];
+
+    const fullList = document.getElementById('coach-students-full-list');
+    if (fullList) {
+      fullList.innerHTML = '';
+      if (students.length === 0) {
+        fullList.innerHTML = `
+          <div class="empty-state-box col-span-2">
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">No connected student athletes found</h3>
+            <p class="text-xs text-slate-500 mt-1">Accept connection requests to start monitoring athletes.</p>
+          </div>
+        `;
+      } else {
+        students.forEach(st => {
+          const stName = st.name || st.student_name || 'Student Athlete';
+          const stEmail = st.email || st.student_email || '';
+          const stId = st.user_id || st.student_id;
+          const stHours = (st.total_practice_hours !== undefined) ? st.total_practice_hours : (st.total_hours || 0);
+
+          fullList.innerHTML += `
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-black flex items-center justify-center text-lg shadow-sm">
+                    ${stName ? stName.charAt(0).toUpperCase() : 'S'}
+                  </div>
+                  <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">${stName}</h3>
+                    <p class="text-xs text-slate-500 font-medium">${stEmail}</p>
+                  </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] uppercase tracking-wider">
+                  ${st.preferred_sport || 'Student Athlete'}
+                </span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl">
+                <div>
+                  <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Workouts</span>
+                  <span class="font-extrabold text-slate-800 dark:text-slate-200">${st.total_sessions || 0} sessions</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Practice</span>
+                  <span class="font-extrabold text-slate-800 dark:text-slate-200">${stHours} hrs</span>
+                </div>
+              </div>
+
+              <button onclick="openCoachStudentDetailModal(${stId})" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+                <span>Inspect Athlete & AI Insights</span>
+              </button>
+            </div>
+          `;
+        });
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+  } catch (err) {
+    console.error('Failed to load coach students list:', err);
+  }
+}
+
 // COACH STUDENT DETAIL & SESSION RATING MODAL HANDLER
 async function openCoachStudentDetailModal(studentId) {
+  switchCsdTab('ratings');
   try {
     const data = await safeFetchJson(`/api/coach/students/${studentId}`);
     const s = data.student;
@@ -2411,14 +2636,36 @@ async function openCoachStudentDetailModal(studentId) {
         aiContainer.innerHTML = `<p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">No AI suggestions generated yet for coached sport (${data.coached_sport_filter}). Record sessions and run AI analysis.</p>`;
       } else {
         data.ai_recommendations.forEach(r => {
+          let coachAdviceBlock = '';
+          if (r.coach_suggestion) {
+            coachAdviceBlock = `
+              <div class="mt-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 text-xs">
+                <b class="text-emerald-800 dark:text-emerald-300">🧑‍🏫 Your Attached Advice:</b> "${r.coach_suggestion}"
+              </div>
+            `;
+          }
+
           aiContainer.innerHTML += `
-            <div class="p-3.5 bg-brand-50/60 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-800 text-xs">
-              <div class="flex justify-between font-bold text-brand-700 dark:text-brand-300 mb-1">
+            <div class="p-3.5 bg-brand-50/60 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-800 text-xs space-y-2">
+              <div class="flex justify-between font-bold text-brand-700 dark:text-brand-300">
                 <span>⚡ ${r.sport_name}: ${r.title}</span>
                 <span class="text-[10px] px-2 py-0.5 rounded bg-brand-200 dark:bg-brand-800 text-brand-900 dark:text-brand-100 font-extrabold">${r.priority} PRIORITY</span>
               </div>
-              <div class="text-slate-700 dark:text-slate-200 mb-1"><b>Recommendation:</b> ${r.recommendation_text}</div>
+              <div class="text-slate-700 dark:text-slate-200"><b>AI Recommendation:</b> ${r.recommendation_text}</div>
               <div class="text-[11px] text-slate-500"><b>Issue:</b> ${r.detected_issue} | <b>Evidence:</b> ${r.evidence}</div>
+              
+              ${coachAdviceBlock}
+
+              <div class="pt-2 border-t border-brand-200/60 dark:border-brand-800/40 flex gap-2">
+                <input type="text" id="coach-ai-input-${r.recommendation_id}" 
+                  placeholder="${r.coach_suggestion ? 'Update advice on this AI recommendation...' : 'Add direct advice on this AI recommendation...'}" 
+                  value="${r.coach_suggestion || ''}"
+                  class="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-800 dark:text-slate-100 outline-none">
+                <button onclick="submitCoachAiSuggestion(${r.recommendation_id})" 
+                  class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg shadow-sm">
+                  ${r.coach_suggestion ? 'Update' : 'Attach Advice'}
+                </button>
+              </div>
             </div>
           `;
         });
@@ -2992,9 +3239,236 @@ async function respondRequestFromNotification(connectionId, accept) {
   }
 }
 
-// Auto-poll notifications every 10 seconds
-setInterval(() => {
-  if (currentToken || localStorage.getItem('athletiq_token')) {
-    loadNotifications();
+// SUBMIT COACH AI RECOMMENDATION ADVICE
+async function submitCoachAiSuggestion(recId) {
+  const inputEl = document.getElementById(`coach-ai-input-${recId}`);
+  if (!inputEl) return;
+  const suggestion = inputEl.value.trim();
+
+  if (!suggestion) {
+    showToast('Please enter your coaching advice before posting', 'warning');
+    return;
   }
-}, 10000);
+
+  try {
+    await safeFetchJson(`/api/ai/recommendations/${recId}/coach-suggestion`, {
+      method: 'POST',
+      body: JSON.stringify({ coach_suggestion: suggestion })
+    });
+
+    showToast('🏆 Coach advice attached to AI recommendation successfully!', 'success');
+    if (typeof loadAIRecommendations === 'function') {
+      loadAIRecommendations(currentAISportFilter);
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to attach coach suggestion', 'error');
+  }
+}
+
+// RICH COACH DASHBOARD IMPLEMENTATION
+async function loadCoachDashboard() {
+  if (!currentUser || currentUser.role !== 'COACH') return;
+
+  const headingEl = document.getElementById('coach-dashboard-heading');
+  const specEl = document.getElementById('coach-banner-spec');
+  if (headingEl) headingEl.textContent = `Welcome, Coach ${currentUser.name}!`;
+  if (specEl) specEl.textContent = currentUser.coaching_specialization || 'Certified Sports Coach Specialist';
+
+  try {
+    // 1. Fetch connected student athletes
+    const studentsData = await safeFetchJson('/api/coach/students');
+    const students = Array.isArray(studentsData) ? studentsData : [];
+
+    // 2. Fetch pending requests
+    const reqsData = await safeFetchJson('/api/coach/requests');
+    const pendingReqs = Array.isArray(reqsData.pending_requests) ? reqsData.pending_requests : [];
+
+    // 3. Fetch feedback items for drill count
+    const feedbackData = await safeFetchJson('/api/coach/feedback');
+    const feedbacks = Array.isArray(feedbackData) ? feedbackData : [];
+
+    // Update Executive Stat Cards
+    const cardStudents = document.getElementById('coach-card-students');
+    const cardPending = document.getElementById('coach-card-pending');
+    const cardDrills = document.getElementById('coach-card-drills-given');
+    const bannerBadge = document.getElementById('coach-banner-request-badge');
+
+    if (cardStudents) cardStudents.textContent = students.length;
+    if (cardPending) cardPending.textContent = pendingReqs.length;
+    if (cardDrills) cardDrills.textContent = feedbacks.length;
+    if (bannerBadge) {
+      if (pendingReqs.length > 0) {
+        bannerBadge.textContent = pendingReqs.length;
+        bannerBadge.classList.remove('hidden');
+      } else {
+        bannerBadge.classList.add('hidden');
+      }
+    }
+
+    // Render Athletes Grid
+    const emptyBox = document.getElementById('coach-dash-empty');
+    const gridContainer = document.getElementById('coach-students-grid');
+
+    if (students.length === 0) {
+      if (emptyBox) emptyBox.classList.remove('hidden');
+      if (gridContainer) gridContainer.innerHTML = '';
+    } else {
+      if (emptyBox) emptyBox.classList.add('hidden');
+      if (gridContainer) {
+        gridContainer.innerHTML = '';
+        students.forEach(st => {
+          const stName = st.name || st.student_name || 'Student Athlete';
+          const stEmail = st.email || st.student_email || '';
+          const stId = st.user_id || st.student_id;
+          const stHours = (st.total_practice_hours !== undefined) ? st.total_practice_hours : (st.total_hours || 0);
+
+          gridContainer.innerHTML += `
+            <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-black flex items-center justify-center text-lg shadow-sm">
+                    ${stName ? stName.charAt(0).toUpperCase() : 'S'}
+                  </div>
+                  <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">${stName}</h3>
+                    <p class="text-xs text-slate-500 font-medium">${stEmail}</p>
+                  </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] uppercase tracking-wider">
+                  ${st.preferred_sport || 'Student Athlete'}
+                </span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl">
+                <div>
+                  <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Workouts</span>
+                  <span class="font-extrabold text-slate-800 dark:text-slate-200">${st.total_sessions || 0} sessions</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Practice</span>
+                  <span class="font-extrabold text-slate-800 dark:text-slate-200">${stHours} hrs</span>
+                </div>
+              </div>
+
+              <button onclick="openCoachStudentDetailModal(${stId})" class="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+                <span>Inspect Athlete & AI Insights</span>
+              </button>
+            </div>
+          `;
+        });
+      }
+    }
+
+    // 4. Load recent student sessions feed
+    loadCoachRecentSessionsFeed(students);
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    console.error('Failed to load coach dashboard:', err);
+  }
+}
+
+// RECENT STUDENT PRACTICE SESSIONS FEED FOR COACH DASHBOARD
+async function loadCoachRecentSessionsFeed(students) {
+  const container = document.getElementById('coach-recent-sessions-container');
+  const cardRecentSessions = document.getElementById('coach-card-recent-sessions');
+  if (!container) return;
+
+  if (!students || students.length === 0) {
+    container.innerHTML = `
+      <div class="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-500">
+        No recent student workouts logged yet. Workouts recorded by your connected athletes will appear here in real-time.
+      </div>
+    `;
+    if (cardRecentSessions) cardRecentSessions.textContent = '0';
+    return;
+  }
+
+  try {
+    let allSessions = [];
+    await Promise.all(students.map(async st => {
+      try {
+        const detail = await safeFetchJson(`/api/coach/students/${st.user_id}`);
+        if (detail && Array.isArray(detail.sessions)) {
+          detail.sessions.forEach(sess => {
+            allSessions.push({ ...sess, student_name: st.name, student_id: st.user_id });
+          });
+        }
+      } catch (e) {}
+    }));
+
+    // Sort by date DESC
+    allSessions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    if (cardRecentSessions) cardRecentSessions.textContent = allSessions.length;
+
+    if (allSessions.length === 0) {
+      container.innerHTML = `
+        <div class="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-500">
+          No workouts logged yet by your connected athletes.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = '';
+    allSessions.slice(0, 5).forEach(s => {
+      const ratingBadge = s.coach_rating ? 
+        `<span class="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-lg">Rated: ${s.coach_rating}/10</span>` :
+        `<button onclick="openCoachRatingWidget(${s.session_id})" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-lg shadow-sm transition">Rate Session</button>`;
+
+      container.innerHTML += `
+        <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs">
+                ${s.student_name ? s.student_name.charAt(0).toUpperCase() : 'S'}
+              </span>
+              <div>
+                <span class="font-extrabold text-slate-900 dark:text-white text-sm">${s.student_name}</span>
+                <span class="text-slate-400 block text-[10px]">${s.sport_name} • ${s.training_type.replace('_',' ')}</span>
+              </div>
+            </div>
+            ${ratingBadge}
+          </div>
+
+          <div class="flex items-center space-x-3 text-slate-500 font-medium">
+            <span>📅 ${s.date}</span>
+            <span>⏱️ ${s.duration_minutes} mins</span>
+            <span>🔥 ${s.intensity} Intensity</span>
+            ${s.training_area ? `<span>🎯 Focus: ${s.training_area}</span>` : ''}
+          </div>
+
+          ${s.notes ? `<div class="p-2.5 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-slate-700 dark:text-slate-200 italic">"${s.notes}"</div>` : ''}
+        </div>
+      `;
+    });
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    console.error('Failed to load recent sessions feed:', err);
+  }
+}
+
+// QUICK RATE SESSION FOR COACH
+async function openCoachRatingWidget(sessionId) {
+  const ratingStr = prompt('Enter Coach Performance Rating (1 to 10):', '8');
+  if (!ratingStr) return;
+  const rating = parseInt(ratingStr);
+  if (isNaN(rating) || rating < 1 || rating > 10) {
+    showToast('Please enter a valid rating between 1 and 10', 'error');
+    return;
+  }
+
+  try {
+    await safeFetchJson(`/api/coach/sessions/${sessionId}/rate`, {
+      method: 'POST',
+      body: JSON.stringify({ coach_rating: rating })
+    });
+    showToast(`Session successfully rated ${rating}/10!`, 'success');
+    loadCoachDashboard();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}

@@ -35,6 +35,10 @@ class ProfileUpdate(BaseModel):
     certification: Optional[str] = None
     profile_photo: Optional[str] = None
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
 # Sports Management
 class SportCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
@@ -104,3 +108,7 @@ class GoalCreate(BaseModel):
 class GoalUpdate(BaseModel):
     current_value: Optional[float] = None
     status: Optional[str] = None
+
+class CoachAiSuggestionInput(BaseModel):
+    coach_suggestion: str
+

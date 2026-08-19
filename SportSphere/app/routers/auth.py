@@ -10,9 +10,11 @@ def register_student(req: StudentRegister):
     if req.password != req.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
     
+    clean_email = (req.email or "").strip().lower()
+    clean_name = (req.name or "").strip()
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM users WHERE email = ?", (req.email.lower(),))
+        cursor.execute("SELECT user_id FROM users WHERE email = ?", (clean_email,))
         if cursor.fetchone():
             raise HTTPException(status_code=400, detail="Email is already registered")
         
@@ -20,7 +22,7 @@ def register_student(req: StudentRegister):
         cursor.execute("""
             INSERT INTO users (role, name, email, password_hash, date_of_birth, preferred_sport, profile_photo)
             VALUES ('STUDENT', ?, ?, ?, ?, ?, ?)
-        """, (req.name, req.email.lower(), hashed, req.date_of_birth, req.preferred_sport, req.profile_photo or "avatar_student_default.png"))
+        """, (clean_name, clean_email, hashed, req.date_of_birth, req.preferred_sport, req.profile_photo or "avatar_student_default.png"))
         
         user_id = cursor.lastrowid
         token = create_access_token({"sub": str(user_id), "role": "STUDENT"})
@@ -29,8 +31,8 @@ def register_student(req: StudentRegister):
             "access_token": token,
             "user": {
                 "user_id": user_id,
-                "name": req.name,
-                "email": req.email.lower(),
+                "name": clean_name,
+                "email": clean_email,
                 "role": "STUDENT",
                 "preferred_sport": req.preferred_sport
             }
@@ -41,9 +43,11 @@ def register_coach(req: CoachRegister):
     if req.password != req.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
     
+    clean_email = (req.email or "").strip().lower()
+    clean_name = (req.name or "").strip()
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM users WHERE email = ?", (req.email.lower(),))
+        cursor.execute("SELECT user_id FROM users WHERE email = ?", (clean_email,))
         if cursor.fetchone():
             raise HTTPException(status_code=400, detail="Email is already registered")
         
@@ -51,7 +55,7 @@ def register_coach(req: CoachRegister):
         cursor.execute("""
             INSERT INTO users (role, name, email, password_hash, coaching_specialization, experience_years, certification, profile_photo)
             VALUES ('COACH', ?, ?, ?, ?, ?, ?, ?)
-        """, (req.name, req.email.lower(), hashed, req.coaching_specialization, req.experience_years, req.certification, req.profile_photo or "avatar_coach_default.png"))
+        """, (clean_name, clean_email, hashed, req.coaching_specialization, req.experience_years, req.certification, req.profile_photo or "avatar_coach_default.png"))
         
         user_id = cursor.lastrowid
         token = create_access_token({"sub": str(user_id), "role": "COACH"})
@@ -60,8 +64,8 @@ def register_coach(req: CoachRegister):
             "access_token": token,
             "user": {
                 "user_id": user_id,
-                "name": req.name,
-                "email": req.email.lower(),
+                "name": clean_name,
+                "email": clean_email,
                 "role": "COACH",
                 "coaching_specialization": req.coaching_specialization
             }
@@ -69,9 +73,10 @@ def register_coach(req: CoachRegister):
 
 @router.post("/login")
 def login(req: LoginRequest):
+    clean_email = (req.email or "").strip().lower()
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE email = ?", (req.email.lower(),))
+        cursor.execute("SELECT * FROM users WHERE email = ?", (clean_email,))
         user_row = cursor.fetchone()
         if not user_row:
             raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -147,14 +152,20 @@ def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
             
     return {"message": "Profile updated successfully"}
 
+from app.schemas import StudentRegister, CoachRegister, LoginRequest, ProfileUpdate, ForgotPasswordRequest
+
 @router.post("/forgot-password")
-def forgot_password(email: str):
+def forgot_password(req: Optional[ForgotPasswordRequest] = None, email: Optional[str] = None):
+    target_email = (req.email if req and req.email else email)
+    if not target_email:
+        raise HTTPException(status_code=400, detail="Email is required")
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM users WHERE email = ?", (email.lower(),))
+        cursor.execute("SELECT user_id FROM users WHERE email = ?", (target_email.lower().strip(),))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Account with this email does not exist")
         new_hash = hash_password("password123")
         cursor.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (new_hash, row["user_id"]))
     return {"message": "Password has been reset to: password123. You may now log in."}
+
