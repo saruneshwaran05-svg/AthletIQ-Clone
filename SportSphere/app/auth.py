@@ -91,7 +91,11 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id, role, name, email, preferred_sport, coaching_specialization, bio, profile_photo FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("""
+            SELECT user_id, role, name, email, date_of_birth, coaching_specialization, 
+                   experience_years, certification, bio, preferred_sport, profile_photo, created_at 
+            FROM users WHERE user_id = ?
+        """, (user_id,))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(

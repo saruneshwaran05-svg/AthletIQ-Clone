@@ -130,6 +130,9 @@ def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
         if req.bio is not None:
             updates.append("bio = ?")
             params.append(req.bio)
+        if req.date_of_birth is not None:
+            updates.append("date_of_birth = ?")
+            params.append(req.date_of_birth)
         if req.preferred_sport is not None:
             updates.append("preferred_sport = ?")
             params.append(req.preferred_sport)
@@ -151,6 +154,62 @@ def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
             cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE user_id = ?", params)
             
     return {"message": "Profile updated successfully"}
+
+@router.get("/profile/{target_user_id}")
+def get_user_profile(target_user_id: int, user: dict = Depends(get_current_user)):
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id, role, name, email, date_of_birth, coaching_specialization,
+                   experience_years, certification, bio, preferred_sport, profile_photo, created_at
+            FROM users WHERE user_id = ?
+        """, (target_user_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        
+        target = dict(row)
+        
+        if target["role"] == "COACH":
+            cursor.execute("SELECT COUNT(*) as count FROM coach_connections WHERE coach_id = ? AND status = 'ACCEPTED'", (target_user_id,))
+            target["total_students"] = cursor.fetchone()["count"]
+            cursor.execute("SELECT COUNT(*) as count FROM coach_feedback WHERE coach_id = ?", (target_user_id,))
+            target["total_feedback"] = cursor.fetchone()["count"]
+            
+            if user["role"] == "STUDENT":
+                cursor.execute("SELECT connection_id, status FROM coach_connections WHERE student_id = ? AND coach_id = ?", (user["user_id"], target_user_id))
+                conn_row = cursor.fetchone()
+                target["connection_status"] = conn_row["status"] if conn_row else "NONE"
+                target["connection_id"] = conn_row["connection_id"] if conn_row else None
+                
+        elif target["role"] == "STUDENT":
+            cursor.execute("SELECT COUNT(*) as total_sessions, COALESCE(SUM(duration_minutes), 0) as total_minutes FROM practice_sessions WHERE student_id = ?", (target_user_id,))
+            sess_row = cursor.fetchone()
+            target["total_sessions"] = sess_row["total_sessions"] if sess_row else 0
+            target["total_hours"] = round((sess_row["total_minutes"] if sess_row else 0) / 60.0, 1)
+            
+            cursor.execute("""
+                SELECT s.sport_id, s.name as sport_name, s.category,
+                       COALESCE(ss.skill_level, 'BEGINNER') as skill_level,
+                       COALESCE(ss.experience_years, 0.0) as experience_years,
+                       ss.training_goal, ss.start_date
+                FROM student_sports ss
+                JOIN sports s ON ss.sport_id = s.sport_id
+                WHERE ss.student_id = ?
+                ORDER BY ss.created_at ASC
+            """, (target_user_id,))
+            target["sports"] = [dict(s) for s in cursor.fetchall()]
+            
+            cursor.execute("SELECT COUNT(*) as count FROM goals WHERE student_id = ? AND status != 'COMPLETED'", (target_user_id,))
+            target["active_goals_count"] = cursor.fetchone()["count"]
+            
+            if user["role"] == "COACH":
+                cursor.execute("SELECT connection_id, status FROM coach_connections WHERE coach_id = ? AND student_id = ?", (user["user_id"], target_user_id))
+                conn_row = cursor.fetchone()
+                target["connection_status"] = conn_row["status"] if conn_row else "NONE"
+                target["connection_id"] = conn_row["connection_id"] if conn_row else None
+
+        return target
 
 from app.schemas import StudentRegister, CoachRegister, LoginRequest, ProfileUpdate, ForgotPasswordRequest
 

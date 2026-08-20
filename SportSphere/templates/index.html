@@ -535,6 +535,11 @@
             <i data-lucide="user-check" class="w-4 h-4 text-brand-600 flex-shrink-0"></i>
             <span>Find & Link Coach</span>
           </button>
+          <button onclick="navTo('profile')" id="nav-btn-student-profile"
+            class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-brand-50 dark:hover:bg-slate-700 transition">
+            <i data-lucide="user" class="w-4 h-4 text-brand-600 flex-shrink-0"></i>
+            <span>My Profile</span>
+          </button>
           <button onclick="downloadPdfReport()"
             class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-brand-50 dark:hover:bg-slate-700 transition">
             <i data-lucide="file-text" class="w-4 h-4 text-brand-600 flex-shrink-0"></i>
@@ -559,20 +564,28 @@
             <i data-lucide="user-plus" class="w-4 h-4 text-brand-600 flex-shrink-0"></i>
             <span>Connection Requests</span>
           </button>
+          <button onclick="navTo('profile')" id="nav-btn-coach-profile"
+            class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-brand-50 dark:hover:bg-slate-700 transition">
+            <i data-lucide="user" class="w-4 h-4 text-brand-600 flex-shrink-0"></i>
+            <span>My Profile</span>
+          </button>
         </div>
       </div>
 
       <!-- User Profile & Logout Box (Fixed at sidebar bottom) -->
       <div
         class="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between bg-white dark:bg-slate-800 flex-shrink-0 z-30">
-        <div class="flex items-center space-x-3 overflow-hidden">
+        <div onclick="navTo('profile')" class="flex items-center space-x-3 overflow-hidden cursor-pointer group flex-1 mr-2 p-1 -m-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/60 transition" title="Click to view & edit your profile">
           <div id="user-avatar-badge"
-            class="w-9 h-9 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center text-sm flex-shrink-0">
+            class="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 font-bold flex items-center justify-center text-sm flex-shrink-0 group-hover:scale-105 transition">
             U
           </div>
           <div class="truncate">
-            <div id="user-display-name" class="text-xs font-bold truncate">User Name</div>
-            <div id="user-display-role" class="text-[10px] text-slate-500 uppercase tracking-wider">ROLE</div>
+            <div id="user-display-name" class="text-xs font-bold truncate group-hover:text-brand-600 transition">User Name</div>
+            <div id="user-display-role" class="text-[10px] text-slate-500 uppercase tracking-wider flex items-center space-x-1">
+              <span id="user-role-label">ROLE</span>
+              <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-brand-600 transition"></i>
+            </div>
           </div>
         </div>
         <button onclick="handleLogout()" class="p-1.5 text-slate-400 hover:text-red-500 transition flex-shrink-0"
@@ -1240,6 +1253,182 @@
           <div id="coach-students-full-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
 
+        <!-- VIEW: USER PROFILE (FULL PAGE VIEW FOR BOTH STUDENT & COACH) -->
+        <div id="view-profile" class="hidden space-y-6 max-w-4xl mx-auto">
+          <!-- Profile Banner Card -->
+          <div class="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center space-x-4">
+              <div id="page-profile-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-blue-500 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0">
+                U
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center space-x-2 flex-wrap gap-1">
+                  <h1 id="page-profile-name" class="text-2xl font-extrabold text-slate-900 dark:text-white">User Name</h1>
+                  <span id="page-profile-role-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
+                    STUDENT
+                  </span>
+                </div>
+                <p id="page-profile-email" class="text-xs text-slate-500 font-medium mt-0.5">user@example.com</p>
+              </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+              <button type="button" onclick="switchPageProfileTab('overview')" id="page-profile-tab-btn-overview"
+                class="px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center space-x-1.5 bg-brand-600 text-white shadow-sm">
+                <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                <span>Overview</span>
+              </button>
+              <button type="button" onclick="switchPageProfileTab('edit')" id="page-profile-tab-btn-edit"
+                class="px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                <span>Edit Profile</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB 1: OVERVIEW -->
+          <div id="page-profile-panel-overview" class="space-y-6">
+            <div id="page-profile-details-container" class="space-y-6">
+              <!-- Dynamically populated by JS with rich cards and Lucide SVG icons -->
+            </div>
+          </div>
+
+          <!-- TAB 2: EDIT PROFILE -->
+          <div id="page-profile-panel-edit" class="hidden">
+            <div class="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+              <div class="border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h3 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <i data-lucide="edit-3" class="w-4 h-4 text-brand-600"></i>
+                  <span>Update Profile Information</span>
+                </h3>
+                <p class="text-xs text-slate-500">Edit your credentials, athletic metrics, and coaching details.</p>
+              </div>
+
+              <form onsubmit="submitPageUpdateProfile(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                      <i data-lucide="user" class="w-4 h-4"></i>
+                    </span>
+                    <input type="text" id="page-edit-name" required
+                      class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Biography / Personal Statement</label>
+                  <textarea id="page-edit-bio" rows="3" placeholder="Tell others about your athletic journey, training focus, or coaching background..."
+                    class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none"></textarea>
+                </div>
+
+                <!-- Student-specific Edit Fields -->
+                <div id="page-edit-student-fields" class="space-y-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Date of Birth</label>
+                      <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                          <i data-lucide="calendar" class="w-4 h-4"></i>
+                        </span>
+                        <input type="date" id="page-edit-dob"
+                          class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Primary Preferred Sport</label>
+                      <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                          <i data-lucide="dumbbell" class="w-4 h-4"></i>
+                        </span>
+                        <input type="text" id="page-edit-pref-sport" placeholder="e.g. Cricket, Football, Basketball"
+                          class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Coach-specific Edit Fields -->
+                <div id="page-edit-coach-fields" class="hidden space-y-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Coaching Specialization *</label>
+                    <div class="relative">
+                      <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                        <i data-lucide="award" class="w-4 h-4"></i>
+                      </span>
+                      <input type="text" id="page-edit-spec" placeholder="e.g. Cricket Fast Bowling Specialist, Endurance Coach"
+                        class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Experience (Years)</label>
+                      <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                          <i data-lucide="clock" class="w-4 h-4"></i>
+                        </span>
+                        <input type="number" step="0.5" id="page-edit-exp" value="1"
+                          class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Certifications & Accreditations</label>
+                      <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                          <i data-lucide="shield-check" class="w-4 h-4"></i>
+                        </span>
+                        <input type="text" id="page-edit-cert" placeholder="e.g. ICC Level 2 Coach, FIFA Accredited"
+                          class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit"
+                  class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-xl text-xs transition shadow-md flex items-center justify-center space-x-2">
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  <span>Save Profile Changes</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW: CROSS-USER PUBLIC PROFILE (FULL PAGE VIEW FOR COACH/STUDENT DISCOVERY) -->
+        <div id="view-public-profile" class="hidden space-y-6 max-w-4xl mx-auto">
+          <!-- Back Bar -->
+          <div class="flex items-center justify-between">
+            <button onclick="returnFromPublicProfile()" class="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5 shadow-sm">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+              <span>Back</span>
+            </button>
+            <div id="view-pub-top-actions" class="flex items-center space-x-2"></div>
+          </div>
+
+          <!-- Public Profile Header Card -->
+          <div class="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4">
+            <div id="view-pub-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0">
+              P
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center space-x-2 flex-wrap gap-1">
+                <h1 id="view-pub-name" class="text-2xl font-extrabold text-slate-900 dark:text-white">Profile Name</h1>
+                <span id="view-pub-role-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
+                  ROLE
+                </span>
+              </div>
+              <p id="view-pub-email" class="text-xs text-slate-500 font-medium mt-0.5">email@example.com</p>
+            </div>
+          </div>
+
+          <!-- Public Profile Body Content -->
+          <div id="view-pub-content" class="space-y-6">
+            <!-- Dynamically populated with rich cards and Lucide SVG icons -->
+          </div>
+        </div>
+
       </main>
     </div>
   </div>
@@ -1403,16 +1592,23 @@
       </button>
 
       <!-- Student Header -->
-      <div class="flex items-center space-x-3 border-b border-slate-200 dark:border-slate-700 pb-4">
-        <div
-          class="w-12 h-12 rounded-full bg-brand-600 text-white font-extrabold text-lg flex items-center justify-center shadow-md"
-          id="csd-avatar">
-          S
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-4">
+        <div class="flex items-center space-x-3">
+          <div
+            class="w-12 h-12 rounded-full bg-brand-600 text-white font-extrabold text-lg flex items-center justify-center shadow-md cursor-pointer hover:opacity-90 transition"
+            id="csd-avatar" onclick="openPublicProfileModal(document.getElementById('csd-student-id').value, 'STUDENT')">
+            S
+          </div>
+          <div>
+            <h2 class="text-xl font-extrabold text-slate-900 dark:text-white cursor-pointer hover:text-brand-600 transition" id="csd-name" onclick="openPublicProfileModal(document.getElementById('csd-student-id').value, 'STUDENT')">Student Name</h2>
+            <p class="text-xs text-slate-500" id="csd-info">student@example.com • Coached Sport View</p>
+          </div>
         </div>
-        <div>
-          <h2 class="text-xl font-extrabold text-slate-900 dark:text-white" id="csd-name">Student Name</h2>
-          <p class="text-xs text-slate-500" id="csd-info">student@example.com • Coached Sport View</p>
-        </div>
+        <button type="button" onclick="openPublicProfileModal(document.getElementById('csd-student-id').value, 'STUDENT')"
+          class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition shadow-sm">
+          <i data-lucide="user" class="w-3.5 h-3.5"></i>
+          <span>Full Profile</span>
+        </button>
       </div>
 
       <!-- Interactive Modal Tab Bar -->
@@ -1649,9 +1845,191 @@
       </div>
     </div>
   </div>
+  <!-- USER SELF-PROFILE MODAL (Overview & Edit for Logged-In Student/Coach) -->
+  <div id="user-profile-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div
+      class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-700 relative max-h-[90vh] overflow-y-auto space-y-5">
+      <button onclick="closeMyProfileModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+
+      <!-- Profile Header -->
+      <div class="flex items-center space-x-4 border-b border-slate-200 dark:border-slate-700 pb-4">
+        <div id="my-profile-avatar"
+          class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-blue-500 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0">
+          U
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <h2 id="my-profile-name" class="text-xl font-extrabold text-slate-900 dark:text-white truncate">User Name</h2>
+            <span id="my-profile-role-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
+              ROLE
+            </span>
+          </div>
+          <p id="my-profile-email" class="text-xs text-slate-500 font-medium truncate mt-0.5">user@example.com</p>
+        </div>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+        <button type="button" onclick="switchMyProfileTab('overview')" id="profile-tab-btn-overview"
+          class="px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-brand-600 text-white shadow-sm">
+          <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+          <span>Profile Overview</span>
+        </button>
+        <button type="button" onclick="switchMyProfileTab('edit')" id="profile-tab-btn-edit"
+          class="px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5 text-brand-500"></i>
+          <span>Edit Profile</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: OVERVIEW -->
+      <div id="profile-panel-overview" class="space-y-4">
+        <div id="profile-details-container" class="space-y-4">
+          <!-- Dynamically populated by JS with rich cards and Lucide SVG icons -->
+        </div>
+      </div>
+
+      <!-- TAB 2: EDIT PROFILE -->
+      <div id="profile-panel-edit" class="hidden space-y-4">
+        <form onsubmit="submitUpdateProfile(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                <i data-lucide="user" class="w-4 h-4"></i>
+              </span>
+              <input type="text" id="edit-profile-name" required
+                class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Biography / Personal Statement</label>
+            <div class="relative">
+              <textarea id="edit-profile-bio" rows="3" placeholder="Tell others about your athletic journey, goals, or coaching philosophy..."
+                class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none"></textarea>
+            </div>
+          </div>
+
+          <!-- Student-specific Edit Fields -->
+          <div id="edit-student-fields" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Date of Birth</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                  </span>
+                  <input type="date" id="edit-profile-dob"
+                    class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Primary Preferred Sport</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                    <i data-lucide="dumbbell" class="w-4 h-4"></i>
+                  </span>
+                  <input type="text" id="edit-profile-preferred-sport" placeholder="e.g. Cricket, Basketball, Football"
+                    class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coach-specific Edit Fields -->
+          <div id="edit-coach-fields" class="hidden space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Coaching Specialization *</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <i data-lucide="award" class="w-4 h-4"></i>
+                </span>
+                <input type="text" id="edit-profile-specialization" placeholder="e.g. Cricket Bowling Specialist, Sprint & Athletics"
+                  class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Experience (Years)</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                    <i data-lucide="clock" class="w-4 h-4"></i>
+                  </span>
+                  <input type="number" step="0.5" id="edit-profile-experience" value="1"
+                    class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Certifications & Credentials</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                  </span>
+                  <input type="text" id="edit-profile-certification" placeholder="e.g. ICC Level 2 Certified Coach"
+                    class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit"
+            class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center space-x-2">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span>Save Profile Changes</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- CROSS-USER PUBLIC PROFILE MODAL (Coaches view Students, Students view Coaches) -->
+  <div id="public-profile-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div
+      class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-700 relative max-h-[90vh] overflow-y-auto space-y-5">
+      <button onclick="closePublicProfileModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+
+      <!-- Public Profile Header -->
+      <div class="flex items-center space-x-4 border-b border-slate-200 dark:border-slate-700 pb-4">
+        <div id="pub-profile-avatar"
+          class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0">
+          P
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <h2 id="pub-profile-name" class="text-xl font-extrabold text-slate-900 dark:text-white truncate">Profile Name</h2>
+            <span id="pub-profile-role-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
+              ROLE
+            </span>
+          </div>
+          <p id="pub-profile-email" class="text-xs text-slate-500 font-medium truncate mt-0.5">email@example.com</p>
+        </div>
+      </div>
+
+      <!-- Public Profile Body Content -->
+      <div id="pub-profile-content" class="space-y-4">
+        <!-- Dynamically rendered with rich cards and Lucide SVG icons -->
+      </div>
+
+      <!-- Public Profile Footer Actions -->
+      <div id="pub-profile-actions" class="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <button onclick="closePublicProfileModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+          Close
+        </button>
+        <div id="pub-profile-extra-actions" class="flex items-center space-x-2"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- Frontend JavaScript Logic -->
-  <script src="/static/js/app.js?v=20260818_v17"></script>
+  <script src="/static/js/app.js?v=20260820_profile_v4"></script>
 </body>
 
 </html>

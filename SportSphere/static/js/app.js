@@ -154,15 +154,24 @@ function showAppWorkspace() {
   }
 }
 
+let currentActiveView = 'dashboard';
+let previousActiveView = 'dashboard';
+
 // Navigation Router
 function navTo(viewName) {
   window.scrollTo(0, 0);
   const mainScroll = document.querySelector('#app-view main');
   if (mainScroll) mainScroll.scrollTop = 0;
 
+  if (viewName !== 'public-profile') {
+    previousActiveView = currentActiveView;
+  }
+  currentActiveView = viewName;
+
   const views = [
     'dashboard', 'my-sports', 'practice', 'history', 'analytics', 
-    'ai-recs', 'goals', 'coach-link', 'coach-dashboard', 'coach-requests', 'coach-students'
+    'ai-recs', 'goals', 'coach-link', 'coach-dashboard', 'coach-requests', 'coach-students',
+    'profile', 'public-profile'
   ];
 
   views.forEach(v => {
@@ -172,6 +181,27 @@ function navTo(viewName) {
 
   const target = document.getElementById(`view-${viewName}`);
   if (target) target.classList.remove('hidden');
+
+  // Update top bar page title
+  const topBarTitle = document.getElementById('top-bar-page-name');
+  if (topBarTitle) {
+    const titles = {
+      'dashboard': 'Dashboard',
+      'my-sports': 'My Sports',
+      'practice': 'Record Practice Session',
+      'history': 'Practice History',
+      'analytics': 'Performance Analytics',
+      'ai-recs': 'AI Recommendations',
+      'goals': 'Sports Goals',
+      'coach-link': 'Find & Link Coach',
+      'coach-dashboard': 'Coach Dashboard',
+      'coach-requests': 'Connection Requests',
+      'coach-students': 'My Students',
+      'profile': 'My Profile',
+      'public-profile': 'Athlete / Coach Profile'
+    };
+    topBarTitle.textContent = titles[viewName] || 'Dashboard';
+  }
 
   // Trigger data fetches per view
   if (viewName === 'dashboard') {
@@ -194,6 +224,7 @@ function navTo(viewName) {
   if (viewName === 'coach-dashboard') loadCoachDashboard();
   if (viewName === 'coach-requests') loadCoachRequests();
   if (viewName === 'coach-students') loadCoachStudents();
+  if (viewName === 'profile') loadUserProfilePage();
 
   lucide.createIcons();
 }
@@ -2526,19 +2557,26 @@ async function searchCoaches() {
         `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center space-x-1"><i data-lucide="check" class="w-3 h-3 inline"></i><span>Matches Your Sport (${c.coach_sport || c.coaching_specialization})</span></span>`;
 
       container.innerHTML += `
-        <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3">
-          <div>
+        <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="cursor-pointer" onclick="openPublicProfileModal(${c.user_id}, 'COACH')">
             <div class="flex items-center space-x-2 mb-0.5">
-              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Coach ${c.name}</h3>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white hover:text-brand-600 transition">Coach ${c.name}</h3>
               ${sportBadge}
             </div>
             <div class="text-xs text-brand-600 font-semibold">${c.coaching_specialization}</div>
             <div class="text-[11px] text-slate-400 mt-0.5">${c.experience_years} years experience ${c.certification ? '• ' + c.certification : ''}</div>
           </div>
-          <div>${btnHtml}</div>
+          <div class="flex items-center space-x-2">
+            <button onclick="openPublicProfileModal(${c.user_id}, 'COACH')" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs flex items-center space-x-1 transition shadow-sm">
+              <i data-lucide="user" class="w-3.5 h-3.5"></i>
+              <span>View Profile</span>
+            </button>
+            ${btnHtml}
+          </div>
         </div>
       `;
     });
+    if (window.lucide) lucide.createIcons();
   } catch (e) { console.error(e); }
 }
 
@@ -2592,21 +2630,31 @@ function renderCoachStudentCards(students, container) {
   container.innerHTML = '';
   if (!Array.isArray(students)) return;
   students.forEach(s => {
+    const studentNameEscaped = (s.student_name || 'Student').replace(/'/g, "\\'");
     container.innerHTML += `
-      <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-        <h3 class="text-base font-bold text-slate-900 dark:text-white">${s.student_name}</h3>
-        <div class="text-xs text-slate-500 mb-2">Primary Sport: ${s.preferred_sport || 'N/A'}</div>
+      <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="cursor-pointer" onclick="openPublicProfileModal(${s.student_id}, 'STUDENT')">
+            <h3 class="text-base font-bold text-slate-900 dark:text-white hover:text-brand-600 transition">${s.student_name}</h3>
+            <div class="text-xs text-slate-500">Primary Sport: ${s.preferred_sport || 'N/A'}</div>
+          </div>
+          <button onclick="openPublicProfileModal(${s.student_id}, 'STUDENT')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs flex items-center space-x-1 transition shadow-sm">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            <span>Profile</span>
+          </button>
+        </div>
         <div class="text-xs text-slate-600 dark:text-slate-300">Total Practice Logged: <b>${s.total_hours} hrs</b> (${s.total_sessions} sessions)</div>
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button onclick="openCoachStudentDetailModal(${s.student_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 shadow-sm">
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button onclick="openCoachStudentDetailModal(${s.student_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 shadow-sm transition">
             <i data-lucide="zap" class="w-3.5 h-3.5"></i>
             <span>AI Analytics & Rate Sessions</span>
           </button>
-          <button onclick="openCoachFeedbackModal(${s.student_id}, '${s.student_name}')" class="px-3 py-1.5 bg-sportsgreen-600 hover:bg-sportsgreen-700 text-white font-bold rounded-lg text-xs">+ Feedback</button>
+          <button onclick="openCoachFeedbackModal(${s.student_id}, '${studentNameEscaped}')" class="px-3 py-1.5 bg-sportsgreen-600 hover:bg-sportsgreen-700 text-white font-bold rounded-lg text-xs transition">+ Feedback</button>
         </div>
       </div>
     `;
   });
+  if (window.lucide) lucide.createIcons();
 }
 
 function switchCsdTab(tabName) {
@@ -2653,12 +2701,12 @@ async function loadCoachStudents() {
           fullList.innerHTML += `
             <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition space-y-4">
               <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="openPublicProfileModal(${stId}, 'STUDENT')">
                   <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-black flex items-center justify-center text-lg shadow-sm">
                     ${stName ? stName.charAt(0).toUpperCase() : 'S'}
                   </div>
                   <div>
-                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">${stName}</h3>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white hover:text-emerald-600 transition">${stName}</h3>
                     <p class="text-xs text-slate-500 font-medium">${stEmail}</p>
                   </div>
                 </div>
@@ -2678,10 +2726,16 @@ async function loadCoachStudents() {
                 </div>
               </div>
 
-              <button onclick="openCoachStudentDetailModal(${stId})" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5">
-                <i data-lucide="eye" class="w-4 h-4"></i>
-                <span>Inspect Athlete & AI Insights</span>
-              </button>
+              <div class="grid grid-cols-2 gap-2">
+                <button onclick="openPublicProfileModal(${stId}, 'STUDENT')" class="py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-extrabold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5">
+                  <i data-lucide="user" class="w-4 h-4"></i>
+                  <span>View Profile</span>
+                </button>
+                <button onclick="openCoachStudentDetailModal(${stId})" class="py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                  <span>AI Insights</span>
+                </button>
+              </div>
             </div>
           `;
         });
@@ -2925,17 +2979,27 @@ async function loadCoachRequests() {
 
       const buttonsHtml = req.is_eligible !== false ? `
         <div class="flex items-center space-x-2">
-          <button onclick="respondCoachRequest(${req.connection_id}, true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-sm">Accept</button>
-          <button onclick="respondCoachRequest(${req.connection_id}, false)" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-sm">Reject</button>
+          <button onclick="openPublicProfileModal(${req.student_id}, 'STUDENT')" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs flex items-center space-x-1 transition shadow-sm">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            <span>Profile</span>
+          </button>
+          <button onclick="respondCoachRequest(${req.connection_id}, true)" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-sm transition">Accept</button>
+          <button onclick="respondCoachRequest(${req.connection_id}, false)" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-sm transition">Reject</button>
         </div>
       ` : `
-        <button onclick="respondCoachRequest(${req.connection_id}, false)" class="px-3 py-1.5 bg-slate-500 hover:bg-slate-600 text-white font-bold rounded-lg text-xs shadow-sm">Reject Request</button>
+        <div class="flex items-center space-x-2">
+          <button onclick="openPublicProfileModal(${req.student_id}, 'STUDENT')" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs flex items-center space-x-1 transition shadow-sm">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            <span>Profile</span>
+          </button>
+          <button onclick="respondCoachRequest(${req.connection_id}, false)" class="px-3 py-1.5 bg-slate-500 hover:bg-slate-600 text-white font-bold rounded-lg text-xs shadow-sm transition">Reject Request</button>
+        </div>
       `;
 
       container.innerHTML += `
         <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h4 class="font-bold text-sm text-slate-900 dark:text-white">${req.student_name}</h4>
+          <div class="cursor-pointer" onclick="openPublicProfileModal(${req.student_id}, 'STUDENT')">
+            <h4 class="font-bold text-sm text-slate-900 dark:text-white hover:text-brand-600 transition">${req.student_name}</h4>
             <div class="text-xs text-slate-500">${req.student_email} • Sport: ${req.preferred_sport || 'N/A'}</div>
             ${lockWarning}
           </div>
@@ -2943,6 +3007,7 @@ async function loadCoachRequests() {
         </div>
       `;
     });
+    if (window.lucide) lucide.createIcons();
   } catch (e) { console.error(e); }
 }
 
@@ -3605,3 +3670,601 @@ async function openCoachRatingWidget(sessionId) {
     showToast(err.message, 'error');
   }
 }
+
+// ==========================================
+// PROFILE MANAGEMENT & CROSS-PROFILE VIEWING
+// ==========================================
+
+function calculateAgeFromDob(dobString) {
+  if (!dobString) return null;
+  const dob = new Date(dobString);
+  if (isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age >= 0 ? age : null;
+}
+
+// 1. FULL-PAGE LOGGED-IN USER PROFILE (navTo('profile'))
+async function loadUserProfilePage() {
+  if (!currentUser) return;
+  const role = (currentUser.role || 'STUDENT').toUpperCase();
+  const isCoach = role === 'COACH';
+
+  switchPageProfileTab('overview');
+
+  // Update Header Banner
+  const avatarEl = document.getElementById('page-profile-avatar');
+  const nameEl = document.getElementById('page-profile-name');
+  const roleBadgeEl = document.getElementById('page-profile-role-badge');
+  const emailEl = document.getElementById('page-profile-email');
+
+  if (avatarEl) {
+    avatarEl.textContent = currentUser.name ? currentUser.name.charAt(0).toUpperCase() : (isCoach ? 'C' : 'S');
+    avatarEl.className = isCoach
+      ? 'w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0'
+      : 'w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-blue-500 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0';
+  }
+  if (nameEl) nameEl.textContent = currentUser.name || 'User Profile';
+  if (roleBadgeEl) {
+    roleBadgeEl.textContent = role;
+    roleBadgeEl.className = isCoach
+      ? 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+      : 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300';
+  }
+  if (emailEl) emailEl.textContent = currentUser.email || '';
+
+  // Populate Edit Fields
+  const editName = document.getElementById('page-edit-name');
+  const editBio = document.getElementById('page-edit-bio');
+  const editDob = document.getElementById('page-edit-dob');
+  const editPrefSport = document.getElementById('page-edit-pref-sport');
+  const editSpec = document.getElementById('page-edit-spec');
+  const editExp = document.getElementById('page-edit-exp');
+  const editCert = document.getElementById('page-edit-cert');
+
+  if (editName) editName.value = currentUser.name || '';
+  if (editBio) editBio.value = currentUser.bio || '';
+  if (editDob) editDob.value = currentUser.date_of_birth || '';
+  if (editPrefSport) editPrefSport.value = currentUser.preferred_sport || '';
+  if (editSpec) editSpec.value = currentUser.coaching_specialization || '';
+  if (editExp) editExp.value = currentUser.experience_years !== undefined ? currentUser.experience_years : 0;
+  if (editCert) editCert.value = currentUser.certification || '';
+
+  const studentFields = document.getElementById('page-edit-student-fields');
+  const coachFields = document.getElementById('page-edit-coach-fields');
+  if (isCoach) {
+    if (studentFields) studentFields.classList.add('hidden');
+    if (coachFields) coachFields.classList.remove('hidden');
+  } else {
+    if (studentFields) studentFields.classList.remove('hidden');
+    if (coachFields) coachFields.classList.add('hidden');
+  }
+
+  // Load and render Profile Overview
+  await renderPageProfileOverview();
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function switchPageProfileTab(tab) {
+  const overviewBtn = document.getElementById('page-profile-tab-btn-overview');
+  const editBtn = document.getElementById('page-profile-tab-btn-edit');
+  const overviewPanel = document.getElementById('page-profile-panel-overview');
+  const editPanel = document.getElementById('page-profile-panel-edit');
+
+  if (tab === 'overview') {
+    if (overviewBtn) {
+      overviewBtn.className = 'px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center space-x-1.5 bg-brand-600 text-white shadow-sm';
+    }
+    if (editBtn) {
+      editBtn.className = 'px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white';
+    }
+    if (overviewPanel) overviewPanel.classList.remove('hidden');
+    if (editPanel) editPanel.classList.add('hidden');
+  } else {
+    if (overviewBtn) {
+      overviewBtn.className = 'px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white';
+    }
+    if (editBtn) {
+      editBtn.className = 'px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center space-x-1.5 bg-brand-600 text-white shadow-sm';
+    }
+    if (overviewPanel) overviewPanel.classList.add('hidden');
+    if (editPanel) editPanel.classList.remove('hidden');
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+async function renderPageProfileOverview() {
+  const container = document.getElementById('page-profile-details-container');
+  if (!container || !currentUser) return;
+  container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400">Loading your profile details...</div>';
+
+  try {
+    const data = await safeFetchJson(`/api/auth/profile/${currentUser.user_id}`);
+    const user = data || currentUser;
+    const role = (user.role || 'STUDENT').toUpperCase();
+
+    if (role === 'COACH') {
+      container.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+              ${getSportIcon(user.coaching_specialization, 'w-5 h-5')}
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Coaching Specialization</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-base">${user.coaching_specialization || 'Sports Specialist'}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex-shrink-0">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Professional Experience</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-base">${user.experience_years || 0} Years Active</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5 sm:col-span-2">
+            <div class="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 flex-shrink-0">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Official Certifications</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-sm">${user.certification || 'Certified Professional Coach'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2 text-xs">
+          <div class="flex items-center space-x-2 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+            <i data-lucide="quote" class="w-4 h-4 text-brand-600"></i>
+            <span>Coaching Philosophy & Biography</span>
+          </div>
+          <p class="text-slate-700 dark:text-slate-300 italic text-sm leading-relaxed">
+            ${user.bio ? `"${user.bio}"` : 'No biography provided yet. Switch to Edit Profile to add one.'}
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm flex items-center space-x-4">
+            <div class="p-3 rounded-2xl bg-emerald-600 text-white flex-shrink-0">
+              <i data-lucide="users" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-emerald-700 dark:text-emerald-300 block text-xs uppercase font-bold">Active Student Athletes</span>
+              <span class="font-black text-slate-900 dark:text-white text-2xl">${user.total_students || 0}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-blue-200 dark:border-blue-900/50 shadow-sm flex items-center space-x-4">
+            <div class="p-3 rounded-2xl bg-brand-600 text-white flex-shrink-0">
+              <i data-lucide="message-square" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-brand-700 dark:text-brand-300 block text-xs uppercase font-bold">Feedback & Drills Provided</span>
+              <span class="font-black text-slate-900 dark:text-white text-2xl">${user.total_feedback || 0}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Student Profile Overview
+      const age = calculateAgeFromDob(user.date_of_birth);
+      const dobDisplay = user.date_of_birth 
+        ? `${user.date_of_birth} ${age !== null ? `(${age} years old)` : ''}`
+        : 'Not specified';
+
+      const sportsListHtml = (user.sports && user.sports.length > 0)
+        ? user.sports.map(sp => `
+            <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs">
+              <div class="flex items-center space-x-3">
+                <div class="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/40 text-brand-600 flex items-center justify-center">
+                  ${getSportIcon(sp.sport_name, 'w-5 h-5')}
+                </div>
+                <div>
+                  <span class="font-extrabold text-sm text-slate-900 dark:text-white">${sp.sport_name}</span>
+                  <span class="text-slate-400 block text-xs mt-0.5">${sp.experience_years || 0} yrs experience • ${sp.training_goal || 'Goal-driven practice'}</span>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
+                ${sp.skill_level || 'ACTIVE'}
+              </span>
+            </div>
+          `).join('')
+        : '<div class="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-400 italic">No sports registered in profile yet. Go to My Sports to add one.</div>';
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex-shrink-0">
+              <i data-lucide="calendar" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Date of Birth & Age</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-sm">${dobDisplay}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex-shrink-0 flex items-center justify-center">
+              ${getSportIcon(user.preferred_sport, 'w-5 h-5')}
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Primary Preferred Sport</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-sm">${user.preferred_sport || 'Not specified'}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5 sm:col-span-2">
+            <div class="p-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex-shrink-0">
+              <i data-lucide="user" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Personal Bio & Athletic Ambition</span>
+              <span class="font-medium text-slate-700 dark:text-slate-300 text-sm italic">${user.bio ? `"${user.bio}"` : 'No bio provided yet. Switch to Edit Profile to add one.'}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lifetime Athletic Activity Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-brand-200 dark:border-brand-900/50 shadow-sm text-center">
+            <div class="text-brand-600 dark:text-brand-400 font-black text-3xl">${user.total_hours || 0}</div>
+            <div class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 mt-1">
+              <i data-lucide="clock" class="w-4 h-4 text-brand-600"></i>
+              <span>Total Practice Hours</span>
+            </div>
+          </div>
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm text-center">
+            <div class="text-emerald-600 dark:text-emerald-400 font-black text-3xl">${user.total_sessions || 0}</div>
+            <div class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 mt-1">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+              <span>Workouts Recorded</span>
+            </div>
+          </div>
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-purple-200 dark:border-purple-900/50 shadow-sm text-center">
+            <div class="text-purple-600 dark:text-purple-400 font-black text-3xl">${user.active_goals_count || 0}</div>
+            <div class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 mt-1">
+              <i data-lucide="target" class="w-4 h-4 text-purple-600"></i>
+              <span>Active Goals</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enrolled Sports Breakdown -->
+        <div class="space-y-3">
+          <div class="flex items-center space-x-2 text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+            <i data-lucide="award" class="w-4 h-4 text-brand-600"></i>
+            <span>Enrolled Sports & Skill Ratings</span>
+          </div>
+          <div class="space-y-3">
+            ${sportsListHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    container.innerHTML = `<div class="text-center py-4 text-xs text-rose-500">Failed to load profile: ${err.message}</div>`;
+  }
+}
+
+async function submitPageUpdateProfile(event) {
+  event.preventDefault();
+  if (!currentUser) return;
+
+  const role = (currentUser.role || 'STUDENT').toUpperCase();
+  const name = document.getElementById('page-edit-name').value.trim();
+  const bio = document.getElementById('page-edit-bio').value.trim();
+
+  const payload = { name, bio };
+
+  if (role === 'STUDENT') {
+    const dob = document.getElementById('page-edit-dob').value;
+    const prefSport = document.getElementById('page-edit-pref-sport').value.trim();
+    if (dob) payload.date_of_birth = dob;
+    if (prefSport) payload.preferred_sport = prefSport;
+  } else if (role === 'COACH') {
+    const spec = document.getElementById('page-edit-spec').value.trim();
+    const exp = parseFloat(document.getElementById('page-edit-exp').value) || 0;
+    const cert = document.getElementById('page-edit-cert').value.trim();
+    if (spec) payload.coaching_specialization = spec;
+    payload.experience_years = exp;
+    if (cert) payload.certification = cert;
+  }
+
+  try {
+    const res = await fetch('/api/auth/profile', {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.detail || 'Failed to update profile');
+
+    showToast('Profile updated successfully!', 'success');
+
+    // Update in-memory user and storage
+    Object.assign(currentUser, payload);
+    const storage = localStorage.getItem('athletiq_token') ? localStorage : sessionStorage;
+    storage.setItem('athletiq_user', JSON.stringify(currentUser));
+
+    // Update header & sidebar UI badges
+    const nameBadge = document.getElementById('user-display-name');
+    const avatarBadge = document.getElementById('user-avatar-badge');
+    const pageName = document.getElementById('page-profile-name');
+    if (nameBadge) nameBadge.textContent = currentUser.name;
+    if (avatarBadge) avatarBadge.textContent = currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U';
+    if (pageName) pageName.textContent = currentUser.name;
+
+    // Switch back to overview tab
+    switchPageProfileTab('overview');
+    await renderPageProfileOverview();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// 2. FULL-PAGE PUBLIC PROFILE VIEW (navTo('public-profile'))
+async function viewPublicProfile(targetUserId, targetRole) {
+  if (!targetUserId) return;
+  navTo('public-profile');
+
+  const content = document.getElementById('view-pub-content');
+  const topActions = document.getElementById('view-pub-top-actions');
+  const avatarEl = document.getElementById('view-pub-avatar');
+  const nameEl = document.getElementById('view-pub-name');
+  const roleBadgeEl = document.getElementById('view-pub-role-badge');
+  const emailEl = document.getElementById('view-pub-email');
+
+  if (content) content.innerHTML = '<div class="text-center py-10 text-xs text-slate-400">Loading athlete / coach profile...</div>';
+  if (topActions) topActions.innerHTML = '';
+
+  try {
+    const target = await safeFetchJson(`/api/auth/profile/${targetUserId}`);
+    if (!target) throw new Error('Profile not found');
+
+    const role = (target.role || targetRole || 'STUDENT').toUpperCase();
+    const isCoach = role === 'COACH';
+
+    if (avatarEl) {
+      avatarEl.textContent = target.name ? target.name.charAt(0).toUpperCase() : (isCoach ? 'C' : 'S');
+      avatarEl.className = isCoach 
+        ? 'w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0'
+        : 'w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md flex-shrink-0';
+    }
+    if (nameEl) nameEl.textContent = (isCoach ? 'Coach ' : '') + (target.name || 'Profile');
+    if (roleBadgeEl) {
+      roleBadgeEl.textContent = role;
+      roleBadgeEl.className = isCoach
+        ? 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+        : 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300';
+    }
+    if (emailEl) emailEl.textContent = target.email || '';
+
+    if (isCoach) {
+      // Render Coach Profile for Student viewing
+      content.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex-shrink-0 flex items-center justify-center">
+              ${getSportIcon(target.coaching_specialization, 'w-5 h-5')}
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Coaching Specialization</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-base">${target.coaching_specialization || 'Sports Specialist'}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex-shrink-0">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Coaching Experience</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-base">${target.experience_years || 0} Years</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5 sm:col-span-2">
+            <div class="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 flex-shrink-0">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Official Certifications</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-sm">${target.certification || 'Certified Professional Coach'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2 text-xs">
+          <div class="flex items-center space-x-2 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+            <i data-lucide="quote" class="w-4 h-4 text-brand-600"></i>
+            <span>Coaching Philosophy & Biography</span>
+          </div>
+          <p class="text-slate-700 dark:text-slate-300 italic text-sm leading-relaxed">
+            ${target.bio ? `"${target.bio}"` : 'Dedicated to developing athletic performance, technical mastery, and disciplined practice.'}
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm flex items-center space-x-4">
+            <div class="p-3 rounded-2xl bg-emerald-600 text-white flex-shrink-0">
+              <i data-lucide="users" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-emerald-700 dark:text-emerald-300 block text-xs uppercase font-bold">Athletes Coached</span>
+              <span class="font-black text-slate-900 dark:text-white text-2xl">${target.total_students || 0} Students</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-blue-200 dark:border-blue-900/50 shadow-sm flex items-center space-x-4">
+            <div class="p-3 rounded-2xl bg-brand-600 text-white flex-shrink-0">
+              <i data-lucide="message-square" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-brand-700 dark:text-brand-300 block text-xs uppercase font-bold">Feedback & Drills Provided</span>
+              <span class="font-black text-slate-900 dark:text-white text-2xl">${target.total_feedback || 0}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (currentUser && currentUser.role === 'STUDENT' && topActions) {
+        if (target.connection_status === 'ACCEPTED') {
+          topActions.innerHTML = `<span class="px-4 py-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-extrabold rounded-xl text-xs flex items-center space-x-1.5"><i data-lucide="check" class="w-4 h-4"></i><span>Connected Coach</span></span>`;
+        } else if (target.connection_status === 'PENDING') {
+          topActions.innerHTML = `<span class="px-4 py-2 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-extrabold rounded-xl text-xs flex items-center space-x-1.5"><i data-lucide="clock" class="w-4 h-4"></i><span>Request Pending</span></span>`;
+        } else {
+          topActions.innerHTML = `
+            <button onclick="connectCoach(${target.user_id})" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center space-x-1.5">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>Connect with Coach</span>
+            </button>
+          `;
+        }
+      }
+    } else {
+      // Render Student Profile for Coach viewing
+      const age = calculateAgeFromDob(target.date_of_birth);
+      const dobDisplay = target.date_of_birth 
+        ? `${target.date_of_birth} ${age !== null ? `(${age} years old)` : ''}`
+        : 'Not specified';
+
+      const sportsListHtml = (target.sports && target.sports.length > 0)
+        ? target.sports.map(sp => `
+            <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs">
+              <div class="flex items-center space-x-3">
+                <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center">
+                  ${getSportIcon(sp.sport_name, 'w-5 h-5')}
+                </div>
+                <div>
+                  <span class="font-extrabold text-sm text-slate-900 dark:text-white">${sp.sport_name}</span>
+                  <span class="text-slate-400 block text-xs mt-0.5">${sp.experience_years || 0} yrs experience • ${sp.training_goal || 'Goal-driven practice'}</span>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                ${sp.skill_level || 'ACTIVE'}
+              </span>
+            </div>
+          `).join('')
+        : '<div class="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-400 italic">No sports registered in profile yet.</div>';
+
+      content.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex-shrink-0">
+              <i data-lucide="calendar" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Date of Birth & Age</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-sm">${dobDisplay}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5">
+            <div class="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex-shrink-0 flex items-center justify-center">
+              ${getSportIcon(target.preferred_sport, 'w-5 h-5')}
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Primary Preferred Sport</span>
+              <span class="font-extrabold text-slate-900 dark:text-white text-sm">${target.preferred_sport || 'Not specified'}</span>
+            </div>
+          </div>
+
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start space-x-3.5 sm:col-span-2">
+            <div class="p-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex-shrink-0">
+              <i data-lucide="user" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Athlete Bio / Ambition</span>
+              <span class="font-medium text-slate-700 dark:text-slate-300 text-sm italic">${target.bio ? `"${target.bio}"` : 'Disciplined student athlete working towards athletic excellence.'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-brand-200 dark:border-brand-900/50 shadow-sm text-center">
+            <div class="text-brand-600 dark:text-brand-400 font-black text-3xl">${target.total_hours || 0}</div>
+            <div class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 mt-1">
+              <i data-lucide="clock" class="w-4 h-4 text-brand-600"></i>
+              <span>Total Practice Hours</span>
+            </div>
+          </div>
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm text-center">
+            <div class="text-emerald-600 dark:text-emerald-400 font-black text-3xl">${target.total_sessions || 0}</div>
+            <div class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 mt-1">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+              <span>Workouts Recorded</span>
+            </div>
+          </div>
+          <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-purple-200 dark:border-purple-900/50 shadow-sm text-center">
+            <div class="text-purple-600 dark:text-purple-400 font-black text-3xl">${target.active_goals_count || 0}</div>
+            <div class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center justify-center space-x-1.5 mt-1">
+              <i data-lucide="target" class="w-4 h-4 text-purple-600"></i>
+              <span>Active Goals</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center space-x-2 text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+            <i data-lucide="award" class="w-4 h-4 text-emerald-600"></i>
+            <span>Enrolled Sports Profile</span>
+          </div>
+          <div class="space-y-3">
+            ${sportsListHtml}
+          </div>
+        </div>
+      `;
+
+      if (currentUser && currentUser.role === 'COACH' && topActions) {
+        const studentNameEsc = (target.name || 'Student').replace(/'/g, "\\'");
+        topActions.innerHTML = `
+          <button onclick="openCoachStudentDetailModal(${target.user_id});" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center space-x-1.5">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+            <span>Inspect Sessions & AI</span>
+          </button>
+          <button onclick="openCoachFeedbackModal(${target.user_id}, '${studentNameEsc}');" class="px-4 py-2 bg-sportsgreen-600 hover:bg-sportsgreen-700 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center space-x-1.5">
+            <i data-lucide="message-square" class="w-4 h-4"></i>
+            <span>+ Feedback</span>
+          </button>
+        `;
+      }
+    }
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    content.innerHTML = `<div class="text-center py-6 text-xs text-rose-500">Failed to load profile: ${err.message}</div>`;
+  }
+}
+
+function returnFromPublicProfile() {
+  const fallback = (currentUser && currentUser.role === 'COACH') ? 'coach-students' : 'coach-link';
+  navTo(previousActiveView && previousActiveView !== 'public-profile' ? previousActiveView : fallback);
+}
+
+// Modal fallback functions
+function openMyProfileModal() {
+  navTo('profile');
+}
+function closeMyProfileModal() {
+  const modal = document.getElementById('user-profile-modal');
+  if (modal) modal.classList.add('hidden');
+}
+function openPublicProfileModal(targetUserId, targetRole) {
+  viewPublicProfile(targetUserId, targetRole);
+}
+function closePublicProfileModal() {
+  const modal = document.getElementById('public-profile-modal');
+  if (modal) modal.classList.add('hidden');
+}
+

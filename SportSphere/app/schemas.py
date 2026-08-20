@@ -29,6 +29,7 @@ class LoginRequest(BaseModel):
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     bio: Optional[str] = None
+    date_of_birth: Optional[str] = None
     preferred_sport: Optional[str] = None
     coaching_specialization: Optional[str] = None
     experience_years: Optional[float] = None
