@@ -101,3 +101,37 @@ body {
 body.dark ::-webkit-scrollbar-thumb {
   background: #475569;
 }
+
+/* Select & Dropdown Styling for Light and Dark Modes */
+select {
+  color-scheme: light dark;
+}
+
+select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.dark select,
+body.dark select,
+html.dark select {
+  color-scheme: dark;
+}
+
+.dark select option,
+body.dark select option,
+html.dark select option {
+  background-color: #1E293B !important;
+  color: #F8FAFC !important;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.dark select option:hover,
+.dark select option:focus,
+.dark select option:checked {
+  background-color: #2563EB !important;
+  color: #FFFFFF !important;
+}

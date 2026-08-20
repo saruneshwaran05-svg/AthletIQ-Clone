@@ -923,8 +923,32 @@ async function loadStudentDashboard(sportId = null) {
   }
 }
 
+function updateSportFilterIcon(selectId, iconContainerId) {
+  const sel = document.getElementById(selectId);
+  const iconContainer = document.getElementById(iconContainerId);
+  if (!sel || !iconContainer) return;
+  const selectedText = (sel.options && sel.selectedIndex >= 0 && sel.options[sel.selectedIndex]) ? sel.options[sel.selectedIndex].text : '';
+  if (!sel.value || selectedText.includes('All Sports')) {
+    iconContainer.innerHTML = '<i data-lucide="layers" class="w-4 h-4 text-brand-600 dark:text-brand-400"></i>';
+  } else {
+    iconContainer.innerHTML = getSportIcon(selectedText, 'w-4 h-4 text-brand-600 dark:text-brand-400 inline-block');
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
 function onDashboardSportFilterChange(sportId) {
+  updateSportFilterIcon('dash-sport-filter', 'dash-sport-filter-icon');
   loadStudentDashboard(sportId);
+}
+
+function onHistorySportFilterChange(sportId) {
+  updateSportFilterIcon('history-sport-filter', 'history-sport-filter-icon');
+  loadPracticeHistory(sportId);
+}
+
+function onAnalyticsSportFilterChange(sportId) {
+  updateSportFilterIcon('analytics-sport-filter', 'analytics-sport-filter-icon');
+  loadAnalyticsCharts(sportId);
 }
 
 async function populateStudentSportFilters() {
@@ -932,22 +956,24 @@ async function populateStudentSportFilters() {
     const res = await fetch('/api/sports/student', { headers: authHeaders() });
     const sports = await res.json();
 
-    const selects = ['dash-sport-filter', 'analytics-sport-filter', 'history-sport-filter'];
-    selects.forEach(id => {
+    const selects = [
+      { id: 'dash-sport-filter', iconId: 'dash-sport-filter-icon', defaultLabel: 'All Sports Combined' },
+      { id: 'analytics-sport-filter', iconId: 'analytics-sport-filter-icon', defaultLabel: 'All Sports Combined' },
+      { id: 'history-sport-filter', iconId: 'history-sport-filter-icon', defaultLabel: 'All Sports' }
+    ];
+    selects.forEach(({ id, iconId, defaultLabel }) => {
       const el = document.getElementById(id);
       if (!el) return;
       const currentVal = el.value;
-      let defaultLabel = '🏆 All Sports Combined';
-      if (id === 'history-sport-filter') defaultLabel = '🏆 All Sports';
       
-      el.innerHTML = `<option value="">${defaultLabel}</option>`;
+      el.innerHTML = `<option value="" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold">${defaultLabel}</option>`;
       if (sports && sports.length > 0) {
         sports.forEach(s => {
-          const icon = getSportIcon(s.name);
-          el.innerHTML += `<option value="${s.sport_id}">${icon} ${s.name}</option>`;
+          el.innerHTML += `<option value="${s.sport_id}" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold">${s.name}</option>`;
         });
       }
       if (currentVal) el.value = currentVal;
+      updateSportFilterIcon(id, iconId);
     });
   } catch (e) { console.error('Error populating sport filters:', e); }
 }
@@ -1099,51 +1125,98 @@ async function loadDashboardPreviews(sportId = null) {
 
     const res = await fetch(recsUrl, { headers: authHeaders() });
     const recs = await res.json();
+    window.cachedDashboardRecs = recs || [];
     
-    const widgetList = document.getElementById('dashboard-ai-suggestions-list');
     const container = document.getElementById('dash-ai-recs-list');
     if (container) container.innerHTML = '';
-    if (widgetList) widgetList.innerHTML = '';
 
     if (!recs || recs.length === 0) {
-      if (container) container.innerHTML = '<p class="text-xs text-slate-400">No AI recommendations generated yet for this selection.</p>';
-      if (widgetList) widgetList.innerHTML = '<p class="text-xs text-slate-500 italic p-3 bg-white/60 dark:bg-slate-800/60 rounded-xl">No AI suggestions found for this selection. Record practice sessions to get sport-specific drill recommendations!</p>';
+      if (container) container.innerHTML = '<p class="text-xs text-slate-400 p-4 text-center bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">No AI recommendations generated yet for this selection.</p>';
     } else {
       recs.slice(0, 3).forEach(r => {
-        const icon = getSportIcon(r.sport_name);
+        const icon = getSportIcon(r.sport_name, 'w-3.5 h-3.5 text-brand-600 dark:text-brand-400');
+        let prioBadge = 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+        if (r.priority === 'HIGH') prioBadge = 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
+
         if (container) {
           container.innerHTML += `
-            <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700">
-              <div class="flex items-center justify-between mb-1">
-                <span class="badge-ai font-bold text-[10px]">🤖 AI Recommendation</span>
-                <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300">
-                  ${icon} ${r.sport_name}
+            <div class="p-3.5 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs hover:shadow-xs transition space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${prioBadge}">
+                  ${r.priority} PRIORITY
+                </span>
+                <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300 flex items-center space-x-1">
+                  ${icon} <span>${r.sport_name}</span>
                 </span>
               </div>
               <h4 class="text-xs font-bold text-slate-900 dark:text-white mt-1">${r.title}</h4>
-              <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">${r.recommendation_text}</p>
-            </div>
-          `;
-        }
-
-        if (widgetList) {
-          widgetList.innerHTML += `
-            <div class="p-3 bg-white dark:bg-slate-800 rounded-xl border border-brand-200 dark:border-brand-800/60 shadow-sm flex items-start space-x-3">
-              <div class="w-8 h-8 rounded-lg bg-accent-500/10 text-accent-500 flex items-center justify-center font-bold text-sm flex-shrink-0">⚡</div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-xs text-slate-900 dark:text-white">${r.sport_name}: ${r.title}</span>
-                  <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">${r.priority} PRIORITY</span>
-                </div>
-                <p class="text-xs text-slate-600 dark:text-slate-300 mt-1"><b>AI Suggestion:</b> ${r.recommendation_text}</p>
-                <div class="text-[10px] text-slate-400 mt-1">Detected Issue: ${r.detected_issue}</div>
+              <p class="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                <b class="text-slate-800 dark:text-slate-200">Diagnosis:</b> ${r.detected_issue}
+              </p>
+              <div class="pt-2 border-t border-slate-200/80 dark:border-slate-600/60 flex items-center justify-between">
+                <button onclick="openAiRecDetailModal(${r.recommendation_id})" class="text-[11px] font-extrabold text-brand-600 dark:text-brand-400 hover:underline flex items-center space-x-1">
+                  <span>View Full Drill Plan & Mechanics</span>
+                  <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                </button>
+                ${r.suggested_goal ? `<span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold truncate max-w-[140px] flex items-center"><i data-lucide="target" class="w-3 h-3 inline mr-1 text-emerald-600 dark:text-emerald-400 flex-shrink-0"></i><span class="truncate">${r.suggested_goal}</span></span>` : ''}
               </div>
             </div>
           `;
         }
       });
+      if (window.lucide) lucide.createIcons();
     }
   } catch (e) { console.error(e); }
+
+function openAiRecDetailModal(recId) {
+  const dashRecs = window.cachedDashboardRecs || [];
+  const fullRecs = window.cachedFullRecs || [];
+  const r = dashRecs.find(item => item.recommendation_id === recId) || fullRecs.find(item => item.recommendation_id === recId);
+  
+  if (!r) return;
+
+  const modal = document.getElementById('ai-rec-detail-modal');
+  if (!modal) return;
+
+  document.getElementById('ardm-title').textContent = r.title;
+  document.getElementById('ardm-sport-name').textContent = r.sport_name;
+  document.getElementById('ardm-detected-issue').textContent = r.detected_issue || 'General Form & Mechanics Optimization';
+  document.getElementById('ardm-evidence').textContent = r.evidence || 'Analyzed across logged workouts.';
+  document.getElementById('ardm-suggested-goal').textContent = r.suggested_goal || 'Maintain 0 errors in next workout.';
+  
+  const textContainer = document.getElementById('ardm-text');
+  textContainer.innerHTML = formatAiText(r.recommendation_text);
+
+  const badge = document.getElementById('ardm-priority-badge');
+  badge.textContent = `${r.priority} PRIORITY`;
+  if (r.priority === 'HIGH') {
+    badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
+  } else {
+    badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+  }
+
+  const btnContainer = document.getElementById('ardm-action-btn-container');
+  const activeGoals = window.cachedActiveGoals || [];
+  const existingGoal = activeGoals.find(g => g.title === r.title);
+  if (existingGoal) {
+    btnContainer.innerHTML = `<span class="px-3.5 py-1.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-xl text-xs flex items-center space-x-1"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i><span>Goal Active</span></span>`;
+  } else {
+    btnContainer.innerHTML = `
+      <button onclick="adoptAiGoal(${r.recommendation_id}); closeAiRecDetailModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-md shadow-brand-500/20 flex items-center space-x-1.5">
+        <i data-lucide="target" class="w-3.5 h-3.5 text-white"></i>
+        <span>Set as Target Goal</span>
+      </button>
+    `;
+  }
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeAiRecDetailModal() {
+  const modal = document.getElementById('ai-rec-detail-modal');
+  if (modal) modal.classList.add('hidden');
+}
 
   // Load Coach Feedback
   try {
@@ -1160,12 +1233,14 @@ async function loadDashboardPreviews(sportId = null) {
     } else {
       feedbacks.slice(0, 3).forEach(f => {
         const replyStatus = f.student_reply ? `
-          <div class="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-[11px] text-emerald-800 dark:text-emerald-300 font-semibold">
-            💬 Your Reply: "${f.student_reply}"
+          <div class="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-[11px] text-emerald-800 dark:text-emerald-300 font-semibold flex items-center space-x-1.5">
+            <i data-lucide="message-square" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span>Your Reply: "${f.student_reply}"</span>
           </div>
         ` : `
           <button onclick="openSuggestionDetailModalFromFeedback(${f.feedback_id})" class="mt-2 px-2.5 py-1 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-[10px] shadow-sm flex items-center space-x-1">
-            <span>💬 Reply to Coach</span>
+            <i data-lucide="message-square" class="w-3 h-3"></i>
+            <span>Reply to Coach</span>
           </button>
         `;
 
@@ -1173,11 +1248,11 @@ async function loadDashboardPreviews(sportId = null) {
           container.innerHTML += `
             <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700">
               <div class="flex items-center justify-between mb-1">
-                <span class="badge-coach font-bold">🧑‍🏫 Coach Feedback</span>
+                <span class="badge-coach font-bold flex items-center space-x-1"><i data-lucide="award" class="w-3 h-3 text-white"></i><span>Coach Feedback</span></span>
                 <span class="text-[10px] text-slate-400">Coach ${f.coach_name} (${f.sport_name})</span>
               </div>
               <p class="text-xs text-slate-700 dark:text-slate-200 mt-1">"${f.feedback_text}"</p>
-              ${f.recommended_drill ? `<div class="text-[11px] font-semibold text-brand-600 dark:text-brand-400 mt-1">Drill: ${f.recommended_drill} (${f.practice_duration_minutes}m)</div>` : ''}
+              ${f.recommended_drill ? `<div class="text-[11px] font-semibold text-brand-600 dark:text-brand-400 mt-1 flex items-center space-x-1"><i data-lucide="dumbbell" class="w-3.5 h-3.5"></i><span>Drill: ${f.recommended_drill} (${f.practice_duration_minutes}m)</span></div>` : ''}
               ${replyStatus}
             </div>
           `;
@@ -1412,17 +1487,19 @@ async function loadPracticeHistory(sportId = null) {
     }
 
     sessions.forEach(s => {
-      const icon = getSportIcon(s.sport_name);
+      const icon = getSportIcon(s.sport_name, 'w-5 h-5 text-brand-600 dark:text-brand-400');
       let metricsHtml = s.metrics.map(m => `<span class="inline-block px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-semibold text-slate-700 dark:text-slate-300 mr-1 mb-1">${m.metric_name.replace('_', ' ')}: <b>${m.metric_value}</b> ${m.metric_unit}</span>`).join('');
-      let probHtml = s.problems.map(p => `<div class="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1">⚠️ Issue: ${p.description} (${p.severity})</div>`).join('');
+      let probHtml = s.problems.map(p => `<div class="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1 flex items-center space-x-1.5"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500 inline flex-shrink-0"></i><span>Issue: ${p.description} (${p.severity})</span></div>`).join('');
 
       container.innerHTML += `
         <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
           <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center space-x-2">
-              <span class="text-base">${icon}</span>
-              <span class="font-bold text-sm text-slate-900 dark:text-white">${s.sport_name}</span>
-              <span class="text-xs text-slate-400">• ${s.date}</span>
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/40 flex items-center justify-center text-brand-600">${icon}</div>
+              <div>
+                <span class="font-bold text-sm text-slate-900 dark:text-white">${s.sport_name}</span>
+                <span class="text-xs text-slate-400 block sm:inline sm:ml-1">• ${s.date}</span>
+              </div>
             </div>
             <button onclick="deletePracticeSession(${s.session_id})" class="text-slate-400 hover:text-red-500 text-xs font-semibold">Delete</button>
           </div>
@@ -1510,13 +1587,13 @@ async function loadAnalyticsCharts(sportId = null) {
 }
 
 function renderSportStatCard(sp, isCompact = false) {
-  const icon = getSportIcon(sp.sport_name);
+  const icon = getSportIcon(sp.sport_name, 'w-6 h-6 text-brand-600 dark:text-brand-400');
   const metricsHtml = (sp.metrics && sp.metrics.length > 0)
     ? sp.metrics.map(m => `
         <div class="p-2.5 bg-slate-50 dark:bg-slate-700/40 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs space-y-1.5">
           <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-1">
-              <span>🎯</span>
+            <span class="font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-1.5">
+              <i data-lucide="target" class="w-3.5 h-3.5 text-brand-600"></i>
               <span>${m.metric_name}</span>
             </span>
             <span class="text-[10px] px-2 py-0.5 bg-slate-200 dark:bg-slate-600/80 rounded-md text-slate-700 dark:text-slate-200 font-bold">${m.total_records} logs</span>
@@ -1547,7 +1624,7 @@ function renderSportStatCard(sp, isCompact = false) {
 
   const strugglesHtml = (sp.struggles && sp.struggles.length > 0)
     ? `<div class="mt-2 text-xs">
-        <span class="font-bold text-rose-600 dark:text-rose-400">⚠️ Key Struggle Areas:</span>
+        <span class="font-bold text-rose-600 dark:text-rose-400 flex items-center space-x-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500"></i><span>Key Struggle Areas:</span></span>
         <div class="flex flex-wrap gap-1 mt-1">
           ${sp.struggles.map(st => `<span class="px-2 py-0.5 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded text-[10px] font-semibold border border-rose-200 dark:border-rose-800">${st.issue} (${st.count}x)</span>`).join('')}
         </div>
@@ -1564,7 +1641,7 @@ function renderSportStatCard(sp, isCompact = false) {
     ? `<div class="mt-2 text-xs bg-slate-50 dark:bg-slate-700/30 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
         <div class="flex items-center justify-between mb-1">
           <span class="font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1">
-            <span>⭐</span>
+            <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i>
             <span>All Coach Ratings Logged (${sp.all_ratings.length}):</span>
           </span>
           <span class="text-[10px] text-slate-400 font-medium">Min: <b class="text-blue-600 dark:text-blue-400">${sp.min_rating ?? 'N/A'}</b> | Max: <b class="text-emerald-600 dark:text-emerald-400">${sp.max_rating ?? 'N/A'}</b></span>
@@ -1581,7 +1658,7 @@ function renderSportStatCard(sp, isCompact = false) {
     <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
       <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-2.5">
         <div class="flex items-center space-x-2.5">
-          <span class="text-2xl">${icon}</span>
+          <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-900/40 flex items-center justify-center text-brand-600 flex-shrink-0">${icon}</div>
           <div>
             <h4 class="font-extrabold text-sm text-slate-900 dark:text-white flex items-center space-x-2">
               <span>${sp.sport_name}</span>
@@ -1662,43 +1739,70 @@ async function loadPerSportStatistics(sportId = null) {
 // AI RECOMMENDATIONS & SPORT ISOLATION LOGIC
 let currentAISportFilter = null;
 
-function getSportIcon(sportName) {
-  if (!sportName) return '🏆';
+const SPORT_SVG_ICONS = {
+  cricket: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21l9.5-9.5a2.5 2.5 0 0 0 0-3.5l-1.5-1.5a2.5 2.5 0 0 0-3.5 0L2 14l3 7z"/><path d="M14 6l4-4 2 2-4 4"/><circle cx="19.5" cy="19.5" r="2.5"/></svg>`,
+  football: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7l3.5 2.5v4L12 16l-3.5-2.5v-4z"/><path d="M12 7V2"/><path d="M15.5 9.5l4.5-2"/><path d="M15.5 13.5l4.5 2"/><path d="M12 16v6"/><path d="M8.5 13.5l-4.5 2"/><path d="M8.5 9.5l-4.5-2"/></svg>`,
+  basketball: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2.5 12h19"/><path d="M12 2.5v19"/><path d="M4.9 4.9c4 4 4 10.2 0 14.2"/><path d="M19.1 4.9c-4 4-4 10.2 0 14.2"/></svg>`,
+  badminton: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M9.5 14.5L5 2l8 4 6-4-4.5 12.5"/><path d="M7 6l10 5"/><path d="M6 10l9 4.5"/></svg>`,
+  tennis: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"/></svg>`,
+  chess: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20h12v2H6z"/><path d="M9 16h6l1 4H8z"/><path d="M9 16c-1.5-2-2-4-2-7 0-3 2-6 6-6 1 2 2 4 1 6l2 1-1 3-3-1"/></svg>`,
+  volleyball: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 12a10 10 0 0 1 5-8.66"/><path d="M12 12a10 10 0 0 1-5-8.66"/><path d="M12 12a10 10 0 0 1 0 10"/><path d="M12 12a10 10 0 0 0-8.66 5"/><path d="M12 12a10 10 0 0 0 8.66 5"/></svg>`,
+  running: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="4" r="2"/><path d="M15 8l-3 4-3-1-3 4"/><path d="M12 12l2 4 4 1"/><path d="M12 16l-2 5"/></svg>`,
+  swimming: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2"/><path d="M2 19c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/><path d="M2 15c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/><path d="M9 11l4-2 3 2 4-1"/></svg>`,
+  cycling: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/><path d="M12 17.5V14l-3-3 4-3 3 3h3"/></svg>`,
+  weightlifting: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v14"/><path d="M18 5v14"/><path d="M2 9v6"/><path d="M22 9v6"/><path d="M6 12h12"/><path d="M4 7v10"/><path d="M20 7v10"/></svg>`,
+  martial: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10c0-3.3 2.7-6 6-6h4c3.3 0 6 2.7 6 6v4c0 3.3-2.7 6-6 6h-4c-3.3 0-6-2.7-6-6v-4z"/><path d="M9 10h6"/><path d="M9 14h6"/><path d="M12 4v16"/></svg>`,
+  tabletennis: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M15 15l6 6"/><path d="M13 17l4 4"/><circle cx="19" cy="5" r="2"/></svg>`,
+  golf: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18v-14l7 4-7 4"/><path d="M4 21c3-1 6-1 8 0 3-1 6-1 8 0"/><circle cx="16" cy="20" r="1"/></svg>`,
+  trophy: (cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34"/><path d="M6 4h12a2 2 0 0 1 2 2v3a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6V6a2 2 0 0 1 2-2z"/></svg>`
+};
+
+function getSportIcon(sportName, className = 'w-5 h-5 inline-block') {
+  if (!sportName) return SPORT_SVG_ICONS.trophy(className);
   const lower = sportName.toLowerCase();
-  if (lower.includes('cricket')) return '🏏';
-  if (lower.includes('football') || lower.includes('soccer')) return '⚽';
-  if (lower.includes('basketball')) return '🏀';
-  if (lower.includes('badminton')) return '🏸';
-  if (lower.includes('tennis')) return '🎾';
-  if (lower.includes('chess')) return '♟️';
-  if (lower.includes('volleyball')) return '🏐';
-  if (lower.includes('run') || lower.includes('athletics')) return '🏃';
-  if (lower.includes('swim')) return '🏊';
-  if (lower.includes('cycling') || lower.includes('bike')) return '🚴';
-  if (lower.includes('weight') || lower.includes('gym')) return '🏋️';
-  if (lower.includes('martial') || lower.includes('boxing') || lower.includes('karate')) return '🥋';
-  if (lower.includes('table tennis') || lower.includes('ping pong')) return '🏓';
-  if (lower.includes('golf')) return '⛳';
-  return '🏆';
+  if (lower.includes('cricket')) return SPORT_SVG_ICONS.cricket(className);
+  if (lower.includes('football') || lower.includes('soccer')) return SPORT_SVG_ICONS.football(className);
+  if (lower.includes('basketball')) return SPORT_SVG_ICONS.basketball(className);
+  if (lower.includes('badminton')) return SPORT_SVG_ICONS.badminton(className);
+  if (lower.includes('tennis')) return SPORT_SVG_ICONS.tennis(className);
+  if (lower.includes('chess')) return SPORT_SVG_ICONS.chess(className);
+  if (lower.includes('volleyball')) return SPORT_SVG_ICONS.volleyball(className);
+  if (lower.includes('run') || lower.includes('athletics')) return SPORT_SVG_ICONS.running(className);
+  if (lower.includes('swim')) return SPORT_SVG_ICONS.swimming(className);
+  if (lower.includes('cycling') || lower.includes('bike')) return SPORT_SVG_ICONS.cycling(className);
+  if (lower.includes('weight') || lower.includes('gym')) return SPORT_SVG_ICONS.weightlifting(className);
+  if (lower.includes('martial') || lower.includes('boxing') || lower.includes('karate')) return SPORT_SVG_ICONS.martial(className);
+  if (lower.includes('table tennis') || lower.includes('ping pong')) return SPORT_SVG_ICONS.tabletennis(className);
+  if (lower.includes('golf')) return SPORT_SVG_ICONS.golf(className);
+  return SPORT_SVG_ICONS.trophy(className);
 }
 
-async function triggerAIAnalysis(sportId = null) {
-  try {
-    let url = '/api/ai/analyze';
-    if (sportId) url += `?sport_id=${sportId}`;
-    const res = await fetch(url, { method: 'POST', headers: authHeaders() });
-    const data = await res.json();
-    showToast(data.message, data.has_sufficient_data ? 'success' : 'warning');
-    loadAIRecommendations(currentAISportFilter);
-  } catch (err) {
-    showToast('Failed to run AI analysis', 'error');
-  }
-}
-
-function onAiSessionSelect(sessionId) {
-  if (!sessionId) return;
-  renderAiSessionDetailCard(parseInt(sessionId));
-}
+const AI_EMOJI_SVG_MAP = {
+  '🛠️': '<i data-lucide="wrench" class="w-4 h-4 text-brand-600 dark:text-brand-400 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🛠': '<i data-lucide="wrench" class="w-4 h-4 text-brand-600 dark:text-brand-400 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🧠': '<i data-lucide="brain" class="w-4 h-4 text-purple-600 dark:text-purple-400 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🧘': '<i data-lucide="heart-pulse" class="w-4 h-4 text-indigo-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '⚡': '<i data-lucide="zap" class="w-4 h-4 text-amber-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '⚙️': '<i data-lucide="settings" class="w-4 h-4 text-slate-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '⚙': '<i data-lucide="settings" class="w-4 h-4 text-slate-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🎯': '<i data-lucide="target" class="w-4 h-4 text-rose-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '📊': '<i data-lucide="bar-chart-2" class="w-4 h-4 text-blue-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🔍': '<i data-lucide="search" class="w-4 h-4 text-teal-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🚀': '<i data-lucide="rocket" class="w-4 h-4 text-emerald-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '💡': '<i data-lucide="lightbulb" class="w-4 h-4 text-amber-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '✅': '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '⭐': '<i data-lucide="star" class="w-4 h-4 text-amber-400 inline-block mr-1.5 flex-shrink-0"></i>',
+  '📝': '<i data-lucide="file-text" class="w-4 h-4 text-slate-600 dark:text-slate-300 inline-block mr-1.5 flex-shrink-0"></i>',
+  '⚠️': '<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '⚠': '<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '💪': '<i data-lucide="shield-check" class="w-4 h-4 text-emerald-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '📋': '<i data-lucide="clipboard-list" class="w-4 h-4 text-brand-600 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🏋️': '<i data-lucide="dumbbell" class="w-4 h-4 text-brand-600 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🏋': '<i data-lucide="dumbbell" class="w-4 h-4 text-brand-600 inline-block mr-1.5 flex-shrink-0"></i>',
+  '🧑‍🏫': '<i data-lucide="award" class="w-4 h-4 text-emerald-600 inline-block mr-1.5 flex-shrink-0"></i>',
+  '💬': '<i data-lucide="message-square" class="w-4 h-4 text-blue-500 inline-block mr-1.5 flex-shrink-0"></i>',
+  '📅': '<i data-lucide="calendar" class="w-4 h-4 text-brand-600 inline-block mr-1.5 flex-shrink-0"></i>'
+};
 
 function formatAiText(text) {
   if (!text) return '';
@@ -1706,9 +1810,14 @@ function formatAiText(text) {
   return lines.map(line => {
     line = line.trim();
     if (!line) return '<div class="h-1.5"></div>';
-    if (line.startsWith('🛠️') || line.startsWith('🧠') || line.startsWith('🧘') || line.startsWith('⚡') || line.startsWith('⚙️') || line.startsWith('🎯') || line.startsWith('📊') || line.startsWith('🔍') || line.startsWith('🚀') || line.startsWith('💡') || line.startsWith('✅') || line.startsWith('⭐') || line.startsWith('📝')) {
-      return `<div class="font-extrabold text-slate-900 dark:text-white mt-2.5 mb-1 text-xs flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-700/80 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-600/50 shadow-2xs"><span>${line}</span></div>`;
+    
+    for (const [emoji, svgIcon] of Object.entries(AI_EMOJI_SVG_MAP)) {
+      if (line.startsWith(emoji)) {
+        const cleanTitle = line.slice(emoji.length).trim();
+        return `<div class="font-extrabold text-slate-900 dark:text-white mt-2.5 mb-1 text-xs flex items-center bg-slate-100 dark:bg-slate-700/80 px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-600/50 shadow-2xs">${svgIcon}<span>${cleanTitle}</span></div>`;
+      }
     }
+
     if (line.startsWith('•') || line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.')) {
       return `<div class="pl-2 text-slate-700 dark:text-slate-200 text-xs leading-relaxed font-medium mb-1 flex items-start space-x-1.5"><span class="text-brand-600 dark:text-brand-400 font-bold select-none">•</span><span class="flex-1">${line.replace(/^•\s*/, '')}</span></div>`;
     }
@@ -1728,18 +1837,18 @@ function renderAiSessionDetailCard(sessionId) {
 
   card.classList.remove('hidden');
 
-  const icon = getSportIcon(s.sport_name);
+  const icon = getSportIcon(s.sport_name, 'w-7 h-7 text-brand-600 dark:text-brand-400');
   const metricsHtml = (s.metrics && s.metrics.length > 0) ?
     s.metrics.map(m => `<span class="px-2.5 py-1 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">${m.metric_name}: <b class="text-brand-600 dark:text-brand-400">${m.metric_value}</b> ${m.metric_unit}</span>`).join(' ')
     : '<span class="text-xs text-slate-400 italic">No specific metric values logged for this session</span>';
 
   const probsHtml = (s.problems && s.problems.length > 0) ?
-    s.problems.map(p => `<div class="p-2.5 bg-rose-50 dark:bg-rose-950/40 rounded-lg text-xs text-rose-800 dark:text-rose-300 font-semibold border border-rose-200 dark:border-rose-900/60">⚠️ <b>Logged Issue:</b> ${p.description} (${p.severity} Severity)</div>`).join('')
-    : '<div class="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-xs text-emerald-800 dark:text-emerald-300 font-medium">✅ Execution smooth with zero logged struggles.</div>';
+    s.problems.map(p => `<div class="p-2.5 bg-rose-50 dark:bg-rose-950/40 rounded-lg text-xs text-rose-800 dark:text-rose-300 font-semibold border border-rose-200 dark:border-rose-900/60 flex items-center space-x-1.5"><i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500 flex-shrink-0"></i><span><b>Logged Issue:</b> ${p.description} (${p.severity} Severity)</span></div>`).join('')
+    : '<div class="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-xs text-emerald-800 dark:text-emerald-300 font-medium flex items-center space-x-1.5"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i><span>Execution smooth with zero logged struggles.</span></div>';
 
   const coachRatingBadge = s.coach_rating ? 
-    `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-extrabold rounded-xl text-xs flex items-center space-x-1 shadow-sm"><span>⭐ Coach Rating: ${s.coach_rating}/10</span></span>` :
-    `<span class="px-3 py-1.5 bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-bold rounded-xl text-xs flex items-center space-x-1 shadow-sm"><span>⏳ Pending Coach Rating</span></span>`;
+    `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-sm"><i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i><span>Coach Rating: ${s.coach_rating}/10</span></span>` :
+    `<span class="px-3 py-1.5 bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-bold rounded-xl text-xs flex items-center space-x-1.5 shadow-sm"><i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i><span>Pending Coach Rating</span></span>`;
 
   let sessionRecsHtml = '';
   if (s.session_recommendations && s.session_recommendations.length > 0) {
@@ -1752,14 +1861,15 @@ function renderAiSessionDetailCard(sessionId) {
       let goalBtnHtml = '';
       if (existingGoal) {
         if (existingGoal.status === 'COMPLETED' || existingGoal.progress_percentage >= 100) {
-          goalBtnHtml = `<span class="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-lg text-[11px]">🎉 Goal Achieved! (100%)</span>`;
+          goalBtnHtml = `<span class="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-lg text-[11px] flex items-center space-x-1"><i data-lucide="trophy" class="w-3.5 h-3.5 text-emerald-600"></i><span>Goal Achieved! (100%)</span></span>`;
         } else {
-          goalBtnHtml = `<span class="px-2.5 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-extrabold rounded-lg text-[11px]">🎯 Goal Active (${existingGoal.progress_percentage || 0}%)</span>`;
+          goalBtnHtml = `<span class="px-2.5 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-extrabold rounded-lg text-[11px] flex items-center space-x-1"><i data-lucide="target" class="w-3.5 h-3.5 text-amber-600"></i><span>Goal Active (${existingGoal.progress_percentage || 0}%)</span></span>`;
         }
       } else {
         goalBtnHtml = `
-          <button onclick="adoptAiGoal(${r.recommendation_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-lg text-xs shadow-sm transition">
-            <span>🎯 Set as Target Goal</span>
+          <button onclick="adoptAiGoal(${r.recommendation_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-lg text-xs shadow-sm transition flex items-center space-x-1">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-white"></i>
+            <span>Set as Target Goal</span>
           </button>
         `;
       }
@@ -1791,7 +1901,7 @@ function renderAiSessionDetailCard(sessionId) {
       if (cf.student_reply) {
         replyStatus = `
           <div class="mt-2.5 p-2.5 bg-brand-50 dark:bg-brand-950/40 rounded-lg border border-brand-200 dark:border-brand-800 text-xs">
-            <div class="font-bold text-brand-700 dark:text-brand-300">💬 Your Reply to Coach:</div>
+            <div class="font-bold text-brand-700 dark:text-brand-300 flex items-center space-x-1.5"><i data-lucide="message-square" class="w-3.5 h-3.5"></i><span>Your Reply to Coach:</span></div>
             <div class="text-slate-800 dark:text-slate-200 italic mt-0.5">${cf.student_reply}</div>
           </div>
         `;
@@ -1810,7 +1920,7 @@ function renderAiSessionDetailCard(sessionId) {
         <div class="p-4 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 space-y-2 text-xs shadow-sm">
           <div class="flex items-center justify-between border-b border-emerald-200/60 dark:border-emerald-900/40 pb-2">
             <div class="flex items-center space-x-2">
-              <span class="w-7 h-7 rounded-full bg-emerald-600 text-white font-extrabold flex items-center justify-center text-xs">🧑‍🏫</span>
+              <span class="w-7 h-7 rounded-full bg-emerald-600 text-white font-extrabold flex items-center justify-center text-xs"><i data-lucide="award" class="w-4 h-4 text-white"></i></span>
               <div>
                 <span class="font-bold text-slate-900 dark:text-white">Coach ${cf.coach_name}</span>
                 <span class="text-[10px] text-slate-500 block">${cf.coaching_specialization || 'Sports Coach'}</span>
@@ -1821,17 +1931,18 @@ function renderAiSessionDetailCard(sessionId) {
             </span>
           </div>
 
-          ${cf.observed_strength ? `<div class="text-slate-700 dark:text-slate-300"><b class="text-emerald-700 dark:text-emerald-400">💪 Observed Strength:</b> ${cf.observed_strength}</div>` : ''}
-          ${cf.observed_weakness ? `<div class="text-slate-700 dark:text-slate-300"><b class="text-rose-600 dark:text-rose-400">⚠️ Observed Weakness:</b> ${cf.observed_weakness}</div>` : ''}
+          ${cf.observed_strength ? `<div class="text-slate-700 dark:text-slate-300 flex items-start space-x-1"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600 inline flex-shrink-0 mt-0.5"></i><span><b class="text-emerald-700 dark:text-emerald-400">Observed Strength:</b> ${cf.observed_strength}</span></div>` : ''}
+          ${cf.observed_weakness ? `<div class="text-slate-700 dark:text-slate-300 flex items-start space-x-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500 inline flex-shrink-0 mt-0.5"></i><span><b class="text-rose-600 dark:text-rose-400">Observed Weakness:</b> ${cf.observed_weakness}</span></div>` : ''}
           
           <div class="p-3 bg-white dark:bg-slate-800 rounded-lg text-slate-800 dark:text-slate-200 leading-relaxed border border-emerald-100 dark:border-emerald-900/40">
-            <b class="text-emerald-700 dark:text-emerald-400 block mb-0.5">📋 Professional Coaching Feedback:</b>
+            <b class="text-emerald-700 dark:text-emerald-400 flex items-center space-x-1 mb-0.5"><i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-emerald-600"></i><span>Professional Coaching Feedback:</span></b>
             ${cf.feedback_text}
           </div>
 
           ${cf.recommended_drill ? `
-            <div class="p-2.5 bg-sportsgreen-500/10 rounded-lg text-[11px] text-slate-700 dark:text-slate-200 font-semibold border border-sportsgreen-500/20">
-              <b>🏋️ Recommended Coach Drill:</b> ${cf.recommended_drill} (${cf.practice_duration_minutes || 30} mins)
+            <div class="p-2.5 bg-sportsgreen-500/10 rounded-lg text-[11px] text-slate-700 dark:text-slate-200 font-semibold border border-sportsgreen-500/20 flex items-center space-x-1.5">
+              <i data-lucide="dumbbell" class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0"></i>
+              <span><b>Recommended Coach Drill:</b> ${cf.recommended_drill} (${cf.practice_duration_minutes || 30} mins)</span>
             </div>
           ` : ''}
 
@@ -1843,7 +1954,7 @@ function renderAiSessionDetailCard(sessionId) {
     coachFeedbackHtml = `
       <div class="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-900/60 text-xs text-slate-700 dark:text-slate-300 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <span class="text-2xl">🧑‍🏫</span>
+          <span class="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center flex-shrink-0"><i data-lucide="award" class="w-6 h-6"></i></span>
           <div>
             <b class="text-emerald-800 dark:text-emerald-300 font-extrabold text-sm block">Coach Rating Logged: ${s.coach_rating}/10</b>
             <span class="text-[11px] text-slate-500">Your coach has evaluated and rated this session's performance.</span>
@@ -1855,7 +1966,7 @@ function renderAiSessionDetailCard(sessionId) {
   } else {
     coachFeedbackHtml = `
       <div class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500 italic flex items-center space-x-2">
-        <span>⏳</span>
+        <i data-lucide="clock" class="w-4 h-4 text-slate-400 flex-shrink-0"></i>
         <span>No direct written coach feedback or rating submitted yet for this session. Connect with a coach to receive direct professional feedback.</span>
       </div>
     `;
@@ -1865,7 +1976,7 @@ function renderAiSessionDetailCard(sessionId) {
     <!-- Session Overview Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-700">
       <div class="flex items-center space-x-3">
-        <div class="w-11 h-11 rounded-2xl bg-brand-50 dark:bg-brand-900/40 text-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+        <div class="w-11 h-11 rounded-2xl bg-brand-50 dark:bg-brand-900/40 text-brand-600 flex items-center justify-center flex-shrink-0 shadow-inner">
           ${icon}
         </div>
         <div>
@@ -1875,8 +1986,11 @@ function renderAiSessionDetailCard(sessionId) {
               ${s.intensity} INTENSITY
             </span>
           </h3>
-          <div class="text-xs text-slate-500 font-medium mt-0.5">
-            📅 Date: <b>${s.date}</b> • Duration: <b>${s.duration_minutes} mins</b> ${s.training_area ? `• Focus: <b>${s.training_area}</b>` : ''}
+          <div class="text-xs text-slate-500 font-medium mt-0.5 flex items-center flex-wrap gap-2">
+            <span class="flex items-center space-x-1"><i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i><span>Date: <b>${s.date}</b></span></span>
+            <span>•</span>
+            <span class="flex items-center space-x-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i><span>Duration: <b>${s.duration_minutes} mins</b></span></span>
+            ${s.training_area ? `<span>•</span><span class="flex items-center space-x-1"><i data-lucide="target" class="w-3.5 h-3.5 text-slate-400"></i><span>Focus: <b>${s.training_area}</b></span></span>` : ''}
           </div>
         </div>
       </div>
@@ -1897,16 +2011,17 @@ function renderAiSessionDetailCard(sessionId) {
       </div>
     </div>
 
-    <!-- 🤖 AI Feedback & Recommendations -->
+    <!-- AI Feedback & Recommendations -->
     <div class="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-700">
       <h4 class="text-xs font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-wider flex items-center space-x-1.5">
         <i data-lucide="sparkles" class="w-4 h-4 text-accent-500"></i>
-        <span>🤖 AI Diagnosis & Session Drill Recommendations</span>
+        <span>AI Diagnosis & Session Drill Recommendations</span>
       </h4>
 
       <div class="p-3.5 bg-brand-50 dark:bg-brand-950/40 rounded-xl border border-brand-200 dark:border-brand-800/60 text-xs">
         <div class="font-extrabold text-brand-700 dark:text-brand-300 flex items-center space-x-1.5 mb-1">
-          <span>💡 AI Session Diagnosis & Technical Analysis:</span>
+          <i data-lucide="lightbulb" class="w-4 h-4 text-amber-500"></i>
+          <span>AI Session Diagnosis & Technical Analysis:</span>
         </div>
         <div class="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">${formatAiText(s.ai_session_feedback)}</div>
       </div>
@@ -1914,11 +2029,11 @@ function renderAiSessionDetailCard(sessionId) {
       <div class="space-y-2.5">${sessionRecsHtml}</div>
     </div>
 
-    <!-- 🧑‍🏫 Coach Feedback Section -->
+    <!-- Coach Feedback Section -->
     <div class="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-700">
       <h4 class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center space-x-1.5">
         <i data-lucide="user-check" class="w-4 h-4 text-sportsgreen-500"></i>
-        <span>🧑‍🏫 Coach Feedback & Performance Evaluation</span>
+        <span>Coach Feedback & Performance Evaluation</span>
       </h4>
 
       ${coachFeedbackHtml}
@@ -1953,6 +2068,7 @@ async function loadAIRecommendations(selectedSportId = null) {
     ]);
 
     const recs = recsRes.ok ? await recsRes.json() : [];
+    window.cachedFullRecs = recs || [];
     const analyses = analRes.ok ? await analRes.json() : [];
     const sessionAnalytics = sessRes.ok ? await sessRes.json() : [];
     const activeGoals = goalsRes.ok ? await goalsRes.json() : [];
@@ -1971,7 +2087,7 @@ async function loadAIRecommendations(selectedSportId = null) {
         cachedSessionAnalytics.forEach(s => {
           const cRatingStr = s.coach_rating ? `Coach Rating: ${s.coach_rating}/10` : 'Unrated';
           sessDropdown.innerHTML += `
-            <option value="${s.session_id}">📅 ${s.date} - ${s.sport_name} (${s.duration_minutes}m ${s.training_type.replace('_',' ')}) • ${cRatingStr}</option>
+            <option value="${s.session_id}">${s.date} - ${s.sport_name} (${s.duration_minutes}m ${s.training_type.replace('_',' ')}) • ${cRatingStr}</option>
           `;
         });
         // Render first session details by default
@@ -1991,12 +2107,12 @@ async function loadAIRecommendations(selectedSportId = null) {
         tabsContainer.innerHTML = `
           <button onclick="loadAIRecommendations(null)" 
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${selectedSportId === null ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}">
-            <span>🌟 All Sports (${sportsList.length})</span>
+            <span><i data-lucide="layers" class="w-3.5 h-3.5 inline mr-1"></i> All Sports (${sportsList.length})</span>
           </button>
         `;
 
         sportsList.forEach(sp => {
-          const icon = getSportIcon(sp.sport_name);
+          const icon = getSportIcon(sp.sport_name, 'w-3.5 h-3.5 inline');
           const isActive = selectedSportId === sp.sport_id;
           tabsContainer.innerHTML += `
             <button onclick="loadAIRecommendations(${sp.sport_id})" 
@@ -2020,8 +2136,9 @@ async function loadAIRecommendations(selectedSportId = null) {
           <h3 class="text-lg font-bold text-slate-900 dark:text-white">No AI Analysis generated yet</h3>
           <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">Record practice sessions to trigger isolated, high-level ML performance analysis & domain-specific drill recommendations for each of your sports.</p>
           <div class="flex items-center justify-center space-x-3 mt-5">
-            <button onclick="triggerAIAnalysis()" class="px-5 py-2.5 bg-gradient-to-r from-brand-600 to-accent-500 text-white font-bold rounded-xl text-xs shadow-md">
-              ⚡ Run AI Analysis Now
+            <button onclick="triggerAIAnalysis()" class="px-5 py-2.5 bg-gradient-to-r from-brand-600 to-accent-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center space-x-1.5">
+              <i data-lucide="zap" class="w-4 h-4 text-white"></i>
+              <span>Run AI Analysis Now</span>
             </button>
             <button onclick="navTo('practice')" class="px-5 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs">
               + Record Practice Session
@@ -2072,18 +2189,18 @@ async function loadAIRecommendations(selectedSportId = null) {
 
     // Render grouped per-sport recommendation sections
     Object.values(groupedData).forEach(group => {
-      const icon = getSportIcon(group.sport_name);
+      const icon = getSportIcon(group.sport_name, 'w-7 h-7 text-brand-600 dark:text-brand-400');
       const analysis = group.analysis;
       
       let trendBadgeClass = 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
-      let trendLabel = '📊 CONSISTENCY';
+      let trendLabel = '<i data-lucide="bar-chart-2" class="w-3.5 h-3.5 inline mr-1"></i> CONSISTENCY';
       if (analysis) {
         if (analysis.trend_type === 'IMPROVEMENT') {
           trendBadgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
-          trendLabel = '📈 UPWARD PROGRESSION';
+          trendLabel = '<i data-lucide="trending-up" class="w-3.5 h-3.5 inline mr-1 text-emerald-600"></i> UPWARD PROGRESSION';
         } else if (analysis.trend_type === 'DECLINE') {
           trendBadgeClass = 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
-          trendLabel = '🔻 PERFORMANCE DIP';
+          trendLabel = '<i data-lucide="trending-down" class="w-3.5 h-3.5 inline mr-1 text-rose-600"></i> PERFORMANCE DIP';
         }
       }
 
@@ -2097,14 +2214,15 @@ async function loadAIRecommendations(selectedSportId = null) {
         let goalBtnHtml = '';
         if (existingGoal) {
           if (existingGoal.status === 'COMPLETED' || existingGoal.progress_percentage >= 100) {
-            goalBtnHtml = `<span class="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-lg text-xs flex items-center space-x-1"><span>🎉 Goal Achieved! (100%)</span></span>`;
+            goalBtnHtml = `<span class="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-lg text-xs flex items-center space-x-1.5"><i data-lucide="trophy" class="w-3.5 h-3.5 text-emerald-600"></i><span>Goal Achieved! (100%)</span></span>`;
           } else {
-            goalBtnHtml = `<span class="px-3 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-extrabold rounded-lg text-xs flex items-center space-x-1"><span>🎯 Goal Active (${existingGoal.progress_percentage || 0}% Progress)</span></span>`;
+            goalBtnHtml = `<span class="px-3 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-extrabold rounded-lg text-xs flex items-center space-x-1.5"><i data-lucide="target" class="w-3.5 h-3.5 text-amber-600"></i><span>Goal Active (${existingGoal.progress_percentage || 0}% Progress)</span></span>`;
           }
         } else {
           goalBtnHtml = `
             <button onclick="adoptAiGoal(${r.recommendation_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-lg text-xs shadow-sm flex items-center space-x-1 transition">
-              <span>🎯 Set as Target Goal</span>
+              <i data-lucide="target" class="w-3.5 h-3.5 text-white"></i>
+              <span>Set as Target Goal</span>
             </button>
           `;
         }
@@ -2115,7 +2233,7 @@ async function loadAIRecommendations(selectedSportId = null) {
             <div class="mt-3 p-3.5 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800/60 text-xs space-y-1.5 shadow-sm">
               <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-2">
-                  <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[10px]">🧑‍🏫</span>
+                  <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[10px]"><i data-lucide="award" class="w-3.5 h-3.5 text-white"></i></span>
                   <span class="font-extrabold text-emerald-800 dark:text-emerald-300">Coach ${r.coach_name || 'Coach'}'s Direct Advice</span>
                 </div>
                 <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">${new Date(r.coach_suggested_at || Date.now()).toLocaleDateString()}</span>
@@ -2131,8 +2249,9 @@ async function loadAIRecommendations(selectedSportId = null) {
         if (currentUser && currentUser.role === 'COACH') {
           coachInputSection = `
             <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-2">
-              <label class="block text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                ✍️ Attach Coach Advice on this AI Recommendation:
+              <label class="block text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center space-x-1">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>Attach Coach Advice on this AI Recommendation:</span>
               </label>
               <div class="flex gap-2">
                 <input type="text" id="coach-ai-input-${r.recommendation_id}" 
@@ -2162,11 +2281,12 @@ async function loadAIRecommendations(selectedSportId = null) {
             <h4 class="text-base font-bold text-slate-900 dark:text-white mt-1 mb-1">${r.title}</h4>
             
             <div class="text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-center space-x-1">
-              <span>⚠️ Diagnosis: ${r.detected_issue}</span>
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500"></i>
+              <span>Diagnosis: ${r.detected_issue}</span>
             </div>
 
             <div class="bg-slate-50 dark:bg-slate-700/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
-              <b class="text-brand-600 dark:text-brand-400 font-bold block mb-1">🎯 Actionable AI Routine:</b>
+              <b class="text-brand-600 dark:text-brand-400 font-bold flex items-center space-x-1 mb-1"><i data-lucide="target" class="w-3.5 h-3.5 text-brand-600"></i><span>Actionable AI Routine:</span></b>
               ${formatAiText(r.recommendation_text)}
             </div>
 
@@ -2199,7 +2319,7 @@ async function loadAIRecommendations(selectedSportId = null) {
           <!-- Sport Header -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-700">
             <div class="flex items-center space-x-3">
-              <div class="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-900/40 text-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+              <div class="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-900/40 text-brand-600 flex items-center justify-center flex-shrink-0 shadow-inner">
                 ${icon}
               </div>
               <div>
@@ -2217,8 +2337,9 @@ async function loadAIRecommendations(selectedSportId = null) {
               <span class="text-xs font-bold px-3 py-1.5 rounded-xl ${trendBadgeClass}">
                 ${trendLabel}
               </span>
-              <button onclick="triggerAIAnalysis(${group.sport_id})" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition">
-                ↻ Re-analyze ${group.sport_name}
+              <button onclick="triggerAIAnalysis(${group.sport_id})" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center space-x-1">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                <span>Re-analyze ${group.sport_name}</span>
               </button>
             </div>
           </div>
@@ -2227,7 +2348,8 @@ async function loadAIRecommendations(selectedSportId = null) {
           ${analysis ? `
             <div class="bg-gradient-to-r from-brand-500/10 via-accent-500/5 to-transparent p-4 rounded-xl border border-brand-500/20">
               <div class="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-1 flex items-center space-x-1">
-                <span>🧠 AI Tactical Diagnosis (${group.sport_name})</span>
+                <i data-lucide="brain" class="w-4 h-4 text-brand-600"></i>
+                <span>AI Tactical Diagnosis (${group.sport_name})</span>
               </div>
               <div class="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
                 ${formatAiText(analysis.analysis_text)}
@@ -2242,19 +2364,21 @@ async function loadAIRecommendations(selectedSportId = null) {
           ${group.sessions && group.sessions.length > 0 ? `
             <div class="space-y-3 pt-2">
               <h4 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
-                <span>📅 Session-Wise AI Analytics (${group.sessions.length} sessions logged)</span>
+                <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>Session-Wise AI Analytics (${group.sessions.length} sessions logged)</span>
               </h4>
               <div class="grid grid-cols-1 gap-2.5">
                 ${group.sessions.map(s => `
                   <div class="p-3.5 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                     <div class="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200 mb-1">
-                      <span>📅 Date: ${s.date} (${s.duration_minutes}m ${s.training_type.replace('_',' ')})</span>
+                      <span class="flex items-center space-x-1"><i data-lucide="calendar" class="w-3.5 h-3.5 text-brand-600"></i><span>Date: ${s.date} (${s.duration_minutes}m ${s.training_type.replace('_',' ')})</span></span>
                       <span class="px-2 py-0.5 rounded text-[10px] ${s.coach_rating ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'} font-extrabold">
                         Coach Rating: ${s.coach_rating ? s.coach_rating + '/10' : 'Pending'}
                       </span>
                     </div>
-                    <p class="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                      💡 <b>AI Session Evaluation:</b> ${s.ai_session_feedback || 'Session recorded successfully.'}
+                    <p class="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed flex items-start space-x-1">
+                      <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5"></i>
+                      <span><b>AI Session Evaluation:</b> ${s.ai_session_feedback || 'Session recorded successfully.'}</span>
                     </p>
                   </div>
                 `).join('')}
@@ -2389,7 +2513,8 @@ async function searchCoaches() {
       } else if (c.is_eligible === false) {
         btnHtml = `
           <button disabled title="${c.lock_reason || 'Sport not in your sports profile'}" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-400 font-bold rounded-lg text-xs cursor-not-allowed flex items-center space-x-1">
-            <span>🔒 Locked (${c.coach_sport || 'Sport Not Tracked'})</span>
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+            <span>Locked (${c.coach_sport || 'Sport Not Tracked'})</span>
           </button>
         `;
       } else {
@@ -2397,8 +2522,8 @@ async function searchCoaches() {
       }
 
       let sportBadge = c.is_eligible === false ?
-        `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300">🔒 Not in Your Sports Profile (${c.coach_sport})</span>` :
-        `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">✓ Matches Your Sport (${c.coach_sport || c.coaching_specialization})</span>`;
+        `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 flex items-center space-x-1"><i data-lucide="lock" class="w-3 h-3 inline"></i><span>Not in Your Sports Profile (${c.coach_sport})</span></span>` :
+        `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center space-x-1"><i data-lucide="check" class="w-3 h-3 inline"></i><span>Matches Your Sport (${c.coach_sport || c.coaching_specialization})</span></span>`;
 
       container.innerHTML += `
         <div class="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3">
@@ -2473,8 +2598,9 @@ function renderCoachStudentCards(students, container) {
         <div class="text-xs text-slate-500 mb-2">Primary Sport: ${s.preferred_sport || 'N/A'}</div>
         <div class="text-xs text-slate-600 dark:text-slate-300">Total Practice Logged: <b>${s.total_hours} hrs</b> (${s.total_sessions} sessions)</div>
         <div class="mt-4 flex flex-wrap gap-2">
-          <button onclick="openCoachStudentDetailModal(${s.student_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-xs flex items-center space-x-1 shadow-sm">
-            <span>⚡ AI Analytics & Rate Sessions</span>
+          <button onclick="openCoachStudentDetailModal(${s.student_id})" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 shadow-sm">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>AI Analytics & Rate Sessions</span>
           </button>
           <button onclick="openCoachFeedbackModal(${s.student_id}, '${s.student_name}')" class="px-3 py-1.5 bg-sportsgreen-600 hover:bg-sportsgreen-700 text-white font-bold rounded-lg text-xs">+ Feedback</button>
         </div>
@@ -2640,7 +2766,7 @@ async function openCoachStudentDetailModal(studentId) {
           if (r.coach_suggestion) {
             coachAdviceBlock = `
               <div class="mt-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 text-xs">
-                <b class="text-emerald-800 dark:text-emerald-300">🧑‍🏫 Your Attached Advice:</b> "${r.coach_suggestion}"
+                <b class="text-emerald-800 dark:text-emerald-300 flex items-center space-x-1"><i data-lucide="award" class="w-3.5 h-3.5 text-emerald-600"></i><span>Your Attached Advice:</span></b> "${r.coach_suggestion}"
               </div>
             `;
           }
@@ -2648,7 +2774,7 @@ async function openCoachStudentDetailModal(studentId) {
           aiContainer.innerHTML += `
             <div class="p-3.5 bg-brand-50/60 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-800 text-xs space-y-2">
               <div class="flex justify-between font-bold text-brand-700 dark:text-brand-300">
-                <span>⚡ ${r.sport_name}: ${r.title}</span>
+                <span class="flex items-center space-x-1"><i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i><span>${r.sport_name}: ${r.title}</span></span>
                 <span class="text-[10px] px-2 py-0.5 rounded bg-brand-200 dark:bg-brand-800 text-brand-900 dark:text-brand-100 font-extrabold">${r.priority} PRIORITY</span>
               </div>
               <div class="text-slate-700 dark:text-slate-200"><b>AI Recommendation:</b> ${r.recommendation_text}</div>
@@ -2673,17 +2799,17 @@ async function openCoachStudentDetailModal(studentId) {
 
       // Render History of Coach Drill Suggestions & Student Replies
       if (data.coach_feedbacks && data.coach_feedbacks.length > 0) {
-        let fbHtml = '<div class="space-y-2 text-xs pt-3 mt-3 border-t border-slate-200 dark:border-slate-700"><h4 class="font-extrabold text-slate-800 dark:text-slate-200 flex items-center space-x-1"><span>💬 Sent Suggestions & Student Replies</span></h4>';
+        let fbHtml = '<div class="space-y-2 text-xs pt-3 mt-3 border-t border-slate-200 dark:border-slate-700"><h4 class="font-extrabold text-slate-800 dark:text-slate-200 flex items-center space-x-1"><i data-lucide="message-square" class="w-3.5 h-3.5"></i><span>Sent Suggestions & Student Replies</span></h4>';
         data.coach_feedbacks.forEach(f => {
           const replyHtml = f.student_reply ? `
             <div class="mt-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
               <div class="font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-between text-[11px]">
-                <span>💬 Student Reply Received:</span>
+                <span class="flex items-center space-x-1"><i data-lucide="message-square" class="w-3.5 h-3.5 text-emerald-600"></i><span>Student Reply Received:</span></span>
                 <span class="text-[10px] text-slate-400 font-normal">${new Date(f.student_reply_at || Date.now()).toLocaleDateString()}</span>
               </div>
               <p class="text-slate-800 dark:text-slate-200 mt-1 font-medium italic">"${f.student_reply}"</p>
             </div>
-          ` : `<div class="mt-1 text-[10px] text-slate-400 italic">⏳ Waiting for student reply...</div>`;
+          ` : `<div class="mt-1 text-[10px] text-slate-400 italic flex items-center space-x-1"><i data-lucide="clock" class="w-3 h-3"></i><span>Waiting for student reply...</span></div>`;
 
           fbHtml += `
             <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
@@ -2710,7 +2836,7 @@ async function openCoachStudentDetailModal(studentId) {
       } else {
         data.sessions.forEach(sess => {
           const metricsHtml = sess.metrics ? sess.metrics.map(m => `<span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-semibold text-slate-600 dark:text-slate-300 mr-1">${m.metric_name}: <b>${m.metric_value}</b> ${m.metric_unit || ''}</span>`).join('') : '';
-          const probsHtml = sess.problems ? sess.problems.map(p => `<div class="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1">⚠️ Issue: ${p.description}</div>`).join('') : '';
+          const probsHtml = sess.problems ? sess.problems.map(p => `<div class="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1 flex items-center space-x-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500"></i><span>Issue: ${p.description}</span></div>`).join('') : '';
           
           let ratingButtons = '';
           for (let r = 1; r <= 10; r++) {
@@ -2723,7 +2849,7 @@ async function openCoachStudentDetailModal(studentId) {
             <div class="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 shadow-sm">
               <div class="flex items-center justify-between text-xs">
                 <div class="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2">
-                  <span>📅 Date: ${sess.date}</span>
+                  <span class="flex items-center space-x-1"><i data-lucide="calendar" class="w-3.5 h-3.5 text-brand-600"></i><span>Date: ${sess.date}</span></span>
                   <span class="px-2 py-0.5 bg-brand-100 text-brand-800 dark:bg-brand-900/50 dark:text-brand-300 rounded font-bold">${sess.sport_name}</span>
                 </div>
                 <div class="text-slate-500 font-semibold">
@@ -2792,7 +2918,7 @@ async function loadCoachRequests() {
     requests.forEach(req => {
       const lockWarning = req.eligibility_warning ? `
         <div class="mt-2 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-300 text-[11px] font-medium flex items-center space-x-1.5">
-          <span>⚠️</span>
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 flex-shrink-0"></i>
           <span>${req.eligibility_warning}</span>
         </div>
       ` : '';
@@ -2987,7 +3113,7 @@ async function adoptAiGoal(recId) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Failed to set target goal');
 
-    showToast('🎯 Target Goal set from AI Suggestion successfully!', 'success');
+    showToast('Target Goal set from AI Suggestion successfully!', 'success');
     if (typeof loadAIRecommendations === 'function') loadAIRecommendations(currentAISportFilter);
     if (typeof loadDashboardPreviews === 'function') loadDashboardPreviews();
     loadNotifications();
@@ -3050,22 +3176,22 @@ async function loadNotifications() {
         notifList.innerHTML = '<div class="p-4 text-center text-slate-400 italic text-xs">No notifications yet.</div>';
       } else {
         data.notifications.forEach(n => {
-          let typeIcon = '🔔';
+          let typeIcon = '<i data-lucide="bell" class="w-4 h-4 text-brand-600"></i>';
           let bgStyle = n.is_read ? 'bg-white dark:bg-slate-800' : 'bg-brand-50/50 dark:bg-brand-900/20 font-semibold';
-          if (n.type === 'AI_SUGGESTION') typeIcon = '⚡';
-          if (n.type === 'DRILL_SUGGESTION' || n.type === 'FEEDBACK') typeIcon = '🎯';
-          if (n.type === 'COACH_REQUEST') typeIcon = '📩';
-          if (n.type === 'COACH_RATING') typeIcon = '🏅';
-          if (n.type === 'STUDENT_REPLY') typeIcon = '💬';
-          if (n.type === 'GOAL_ACHIEVED') typeIcon = '🎉';
-          if (n.type === 'GOAL_ADOPTED') typeIcon = '🎯';
+          if (n.type === 'AI_SUGGESTION') typeIcon = '<i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>';
+          if (n.type === 'DRILL_SUGGESTION' || n.type === 'FEEDBACK') typeIcon = '<i data-lucide="target" class="w-4 h-4 text-emerald-500"></i>';
+          if (n.type === 'COACH_REQUEST') typeIcon = '<i data-lucide="mail" class="w-4 h-4 text-blue-500"></i>';
+          if (n.type === 'COACH_RATING') typeIcon = '<i data-lucide="award" class="w-4 h-4 text-purple-500"></i>';
+          if (n.type === 'STUDENT_REPLY') typeIcon = '<i data-lucide="message-square" class="w-4 h-4 text-teal-500"></i>';
+          if (n.type === 'GOAL_ACHIEVED') typeIcon = '<i data-lucide="trophy" class="w-4 h-4 text-amber-500"></i>';
+          if (n.type === 'GOAL_ADOPTED') typeIcon = '<i data-lucide="target" class="w-4 h-4 text-rose-500"></i>';
 
           const encTitle = encodeURIComponent(n.title);
           const encMsg = encodeURIComponent(n.message);
 
           notifList.innerHTML += `
             <div onclick="handleNotificationClick(${n.notification_id}, '${n.type}', '${encTitle}', '${encMsg}')" class="p-3 ${bgStyle} hover:bg-slate-100 dark:hover:bg-slate-700/60 transition cursor-pointer flex items-start space-x-2.5">
-              <span class="text-sm flex-shrink-0">${typeIcon}</span>
+              <span class="flex-shrink-0 mt-0.5">${typeIcon}</span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between">
                   <span class="font-bold text-slate-900 dark:text-white text-xs truncate">${n.title}</span>
@@ -3263,7 +3389,7 @@ async function submitCoachAiSuggestion(recId) {
       body: JSON.stringify({ coach_suggestion: suggestion })
     });
 
-    showToast('🏆 Coach advice attached to AI recommendation successfully!', 'success');
+    showToast('Coach advice attached to AI recommendation successfully!', 'success');
     if (typeof loadAIRecommendations === 'function') {
       loadAIRecommendations(currentAISportFilter);
     }
@@ -3440,11 +3566,11 @@ async function loadCoachRecentSessionsFeed(students) {
             ${ratingBadge}
           </div>
 
-          <div class="flex items-center space-x-3 text-slate-500 font-medium">
-            <span>📅 ${s.date}</span>
-            <span>⏱️ ${s.duration_minutes} mins</span>
-            <span>🔥 ${s.intensity} Intensity</span>
-            ${s.training_area ? `<span>🎯 Focus: ${s.training_area}</span>` : ''}
+          <div class="flex items-center space-x-3 text-slate-500 font-medium flex-wrap gap-y-1">
+            <span class="flex items-center space-x-1"><i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i><span>${s.date}</span></span>
+            <span class="flex items-center space-x-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i><span>${s.duration_minutes} mins</span></span>
+            <span class="flex items-center space-x-1"><i data-lucide="flame" class="w-3.5 h-3.5 text-amber-500"></i><span>${s.intensity} Intensity</span></span>
+            ${s.training_area ? `<span class="flex items-center space-x-1"><i data-lucide="target" class="w-3.5 h-3.5 text-brand-600"></i><span>Focus: ${s.training_area}</span></span>` : ''}
           </div>
 
           ${s.notes ? `<div class="p-2.5 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-slate-700 dark:text-slate-200 italic">"${s.notes}"</div>` : ''}

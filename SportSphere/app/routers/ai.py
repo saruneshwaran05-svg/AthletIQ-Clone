@@ -98,11 +98,18 @@ def get_ai_recommendations(sport_id: Optional[int] = Query(None), session_id: Op
             
         recs = [dict(r) for r in cursor.fetchall()]
         
-        # Deduplicate recommendations by (sport_id, session_id, title)
+        # Deduplicate recommendations by (sport_id, normalized topic) to prevent repetitive cards
+        import re
         seen = set()
         unique_recs = []
         for r in recs:
-            key = (r["sport_id"], r.get("session_id"), r["title"].strip().lower() if r.get("title") else "")
+            title_clean = (r.get("title") or "").strip().lower()
+            title_clean = re.sub(r"^.*?session \d{4}-\d{2}-\d{2}.*?:\s*", "", title_clean)
+            issue_clean = (r.get("detected_issue") or "").strip().lower()
+            issue_clean = re.sub(r"^session issue on \d{4}-\d{2}-\d{2}:\s*", "", issue_clean)
+
+            topic_key = title_clean if title_clean else issue_clean
+            key = (r["sport_id"], topic_key)
             if key not in seen:
                 seen.add(key)
                 unique_recs.append(r)

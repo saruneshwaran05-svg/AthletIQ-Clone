@@ -256,7 +256,7 @@
         <div class="flex items-center space-x-2 mb-2">
           <div
             class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-black text-sm shadow-md shadow-brand-500/30">
-            🏆
+            <i data-lucide="trophy" class="w-4 h-4 text-white"></i>
           </div>
           <span class="text-xs font-extrabold tracking-wider uppercase text-brand-600 dark:text-brand-400">AthletIQ
             Portal</span>
@@ -594,7 +594,7 @@
           </button>
           <h2 id="top-bar-title"
             class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
-            <span>🏆</span>
+            <i data-lucide="trophy" class="w-4 h-4 text-brand-600"></i>
             <span id="top-bar-page-name">Dashboard</span>
           </h2>
         </div>
@@ -673,12 +673,14 @@
             </div>
             <div class="flex items-center space-x-3 flex-wrap gap-2">
               <div
-                class="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700/80 px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 shadow-inner">
-                <label for="dash-sport-filter" class="text-xs font-bold text-slate-600 dark:text-slate-300">Filter
-                  Sport:</label>
+                class="flex items-center space-x-2.5 bg-slate-100 dark:bg-slate-700/80 px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 shadow-inner">
+                <span id="dash-sport-filter-icon" class="flex items-center justify-center text-brand-600 dark:text-brand-400">
+                  <i data-lucide="layers" class="w-4 h-4"></i>
+                </span>
+                <label for="dash-sport-filter" class="text-xs font-bold text-slate-600 dark:text-slate-300">Filter Sport:</label>
                 <select id="dash-sport-filter" onchange="onDashboardSportFilterChange(this.value)"
                   class="text-xs font-extrabold text-slate-900 dark:text-white bg-transparent outline-none cursor-pointer">
-                  <option value="">🏆 All Sports Combined</option>
+                  <option value="" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">All Sports Combined</option>
                 </select>
               </div>
               <button onclick="navTo('practice')"
@@ -720,24 +722,6 @@
             </div>
           </div>
 
-          <!-- AI Suggestions & Coach Drill Feedback Widget for Students -->
-          <div id="student-ai-suggestions-widget"
-            class="bg-gradient-to-r from-brand-600/10 via-accent-500/10 to-sportsgreen-500/10 p-5 rounded-2xl border border-brand-500/20 space-y-3">
-            <div class="flex items-center justify-between">
-              <h3
-                class="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
-                <i data-lucide="sparkles" class="w-4 h-4 text-accent-500"></i>
-                <span>⚡ AI Analytics Suggestions & Coach Drill Feedback</span>
-              </h3>
-              <button onclick="navTo('ai-recs')"
-                class="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline">View All Suggestions
-                →</button>
-            </div>
-            <div id="dashboard-ai-suggestions-list" class="space-y-2">
-              <p class="text-xs text-slate-500 italic">Record practice sessions to see personalized AI drill suggestions
-                and coach recommendations here.</p>
-            </div>
-          </div>
 
           <!-- Dashboard Empty State or Content -->
           <div id="dash-empty-state" class="empty-state-box">
@@ -945,12 +929,14 @@
               <p class="text-xs text-slate-500 dark:text-slate-400">View and filter your recorded practice sessions by
                 sport.</p>
             </div>
-            <div class="flex items-center space-x-2">
-              <label for="history-sport-filter" class="text-xs font-bold text-slate-500 dark:text-slate-400">Filter
-                Sport:</label>
-              <select id="history-sport-filter" onchange="loadPracticeHistory(this.value)"
-                class="text-xs font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 outline-none cursor-pointer shadow-sm">
-                <option value="">🏆 All Sports</option>
+            <div class="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700/80 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-600 shadow-inner">
+              <span id="history-sport-filter-icon" class="flex items-center justify-center text-brand-600 dark:text-brand-400">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+              </span>
+              <label for="history-sport-filter" class="text-xs font-bold text-slate-600 dark:text-slate-300">Filter Sport:</label>
+              <select id="history-sport-filter" onchange="onHistorySportFilterChange(this.value)"
+                class="text-xs font-bold text-slate-900 dark:text-white bg-transparent outline-none cursor-pointer">
+                <option value="" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">All Sports</option>
               </select>
             </div>
           </div>
@@ -966,12 +952,14 @@
               <p class="text-xs text-slate-500 dark:text-slate-400">Interactive charts and trend progression calculated
                 strictly from your data.</p>
             </div>
-            <div class="flex items-center space-x-2">
-              <label for="analytics-sport-filter" class="text-xs font-bold text-slate-500 dark:text-slate-400">Filter
-                Sport:</label>
-              <select id="analytics-sport-filter" onchange="loadAnalyticsCharts(this.value)"
-                class="text-xs font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 outline-none cursor-pointer shadow-sm">
-                <option value="">🏆 All Sports Combined</option>
+            <div class="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700/80 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-600 shadow-inner">
+              <span id="analytics-sport-filter-icon" class="flex items-center justify-center text-brand-600 dark:text-brand-400">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+              </span>
+              <label for="analytics-sport-filter" class="text-xs font-bold text-slate-600 dark:text-slate-300">Filter Sport:</label>
+              <select id="analytics-sport-filter" onchange="onAnalyticsSportFilterChange(this.value)"
+                class="text-xs font-bold text-slate-900 dark:text-white bg-transparent outline-none cursor-pointer">
+                <option value="" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">All Sports Combined</option>
               </select>
             </div>
           </div>
@@ -1000,7 +988,7 @@
               <div class="flex items-center justify-between">
                 <div>
                   <h3 class="text-lg font-extrabold text-slate-900 dark:text-white flex items-center space-x-2">
-                    <span>📊</span>
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-brand-600"></i>
                     <span>Per-Sport Performance Statistics</span>
                   </h3>
                   <p class="text-xs text-slate-500 dark:text-slate-400">Detailed metric averages, practice hours, and
@@ -1556,8 +1544,8 @@
 
       <div class="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-3">
         <div
-          class="w-10 h-10 rounded-full bg-sportsgreen-600 text-white font-extrabold flex items-center justify-center text-base">
-          🧑‍🏫
+          class="w-10 h-10 rounded-full bg-sportsgreen-600 text-white font-extrabold flex items-center justify-center">
+          <i data-lucide="award" class="w-5 h-5 text-white"></i>
         </div>
         <div>
           <h3 class="text-base font-extrabold text-slate-900 dark:text-white" id="sdm-title">Coach Drill Suggestion</h3>
@@ -1594,6 +1582,70 @@
             Send Reply to Coach
           </button>
         </form>
+      </div>
+    </div>
+  <!-- AI RECOMMENDATION DETAIL MODAL -->
+  <div id="ai-rec-detail-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div
+      class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-700 relative max-h-[90vh] overflow-y-auto space-y-4">
+      <button onclick="closeAiRecDetailModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+
+      <div class="flex items-center space-x-3 border-b border-slate-200 dark:border-slate-700 pb-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-900/40 text-brand-600 flex items-center justify-center font-bold">
+          <i data-lucide="sparkles" class="w-5 h-5 text-accent-500"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span id="ardm-priority-badge" class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">HIGH PRIORITY</span>
+            <span id="ardm-sport-name" class="text-xs font-bold text-slate-500">Cricket</span>
+          </div>
+          <h3 class="text-base font-extrabold text-slate-900 dark:text-white mt-0.5" id="ardm-title">Recommendation Title</h3>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-rose-50/80 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-800/50 flex items-start space-x-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5"></i>
+          <div>
+            <span class="font-bold text-rose-800 dark:text-rose-300">Detected Diagnostic Issue:</span>
+            <p id="ardm-detected-issue" class="text-rose-700 dark:text-rose-200 mt-0.5"></p>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+          <div class="font-bold text-brand-600 dark:text-brand-400 flex items-center space-x-1.5">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+            <span>Actionable Sports-Science Drill Plan & Mechanics:</span>
+          </div>
+          <div id="ardm-text" class="text-slate-700 dark:text-slate-200 leading-relaxed font-medium"></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div class="p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div class="font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center space-x-1">
+              <i data-lucide="bar-chart" class="w-3.5 h-3.5 text-brand-600"></i>
+              <span>Empirical Evidence:</span>
+            </div>
+            <p id="ardm-evidence" class="text-slate-600 dark:text-slate-300"></p>
+          </div>
+          <div class="p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div class="font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center space-x-1">
+              <i data-lucide="target" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Suggested Target Goal:</span>
+            </div>
+            <p id="ardm-suggested-goal" class="text-emerald-600 dark:text-emerald-400 font-semibold"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <button onclick="closeAiRecDetailModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs hover:bg-slate-200">
+          Close
+        </button>
+        <div id="ardm-action-btn-container"></div>
       </div>
     </div>
   </div>

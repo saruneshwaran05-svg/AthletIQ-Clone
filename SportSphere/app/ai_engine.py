@@ -641,13 +641,18 @@ def analyze_single_sport(student_id: int, sport_id: int, sport_name: str, df_ses
         "session_analytics": session_analytics
     }
 
-    # 2. Generate Session-Wise Recommendations for EVERY recorded practice session
-    session_recs = _generate_session_wise_recs(student_id, sport_id, sport_name, df_sessions, df_metrics, df_problems)
-
-    # 3. Generate Multi-Dimensional High-Level Recommendations
+    # 2. Generate Multi-Dimensional High-Level Recommendations (consolidated, unique per topic)
     high_level_recs = _generate_high_level_recs(student_id, sport_id, sport_name, df_sessions, df_metrics, df_problems, avg_rating)
 
-    all_recommendations = high_level_recs + session_recs
+    # Deduplicate high-level recommendations by sport_id and title
+    seen_keys = set()
+    all_recommendations = []
+    for r in high_level_recs:
+        key = (r["sport_id"], r["title"].strip().lower())
+        if key not in seen_keys:
+            seen_keys.add(key)
+            all_recommendations.append(r)
+
     return analysis_obj, all_recommendations
 
 
