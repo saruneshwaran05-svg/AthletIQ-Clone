@@ -1207,56 +1207,6 @@ async function loadDashboardPreviews(sportId = null) {
     }
   } catch (e) { console.error(e); }
 
-function openAiRecDetailModal(recId) {
-  const dashRecs = window.cachedDashboardRecs || [];
-  const fullRecs = window.cachedFullRecs || [];
-  const r = dashRecs.find(item => item.recommendation_id === recId) || fullRecs.find(item => item.recommendation_id === recId);
-  
-  if (!r) return;
-
-  const modal = document.getElementById('ai-rec-detail-modal');
-  if (!modal) return;
-
-  document.getElementById('ardm-title').textContent = r.title;
-  document.getElementById('ardm-sport-name').textContent = r.sport_name;
-  document.getElementById('ardm-detected-issue').textContent = r.detected_issue || 'General Form & Mechanics Optimization';
-  document.getElementById('ardm-evidence').textContent = r.evidence || 'Analyzed across logged workouts.';
-  document.getElementById('ardm-suggested-goal').textContent = r.suggested_goal || 'Maintain 0 errors in next workout.';
-  
-  const textContainer = document.getElementById('ardm-text');
-  textContainer.innerHTML = formatAiText(r.recommendation_text);
-
-  const badge = document.getElementById('ardm-priority-badge');
-  badge.textContent = `${r.priority} PRIORITY`;
-  if (r.priority === 'HIGH') {
-    badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
-  } else {
-    badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
-  }
-
-  const btnContainer = document.getElementById('ardm-action-btn-container');
-  const activeGoals = window.cachedActiveGoals || [];
-  const existingGoal = activeGoals.find(g => g.title === r.title);
-  if (existingGoal) {
-    btnContainer.innerHTML = `<span class="px-3.5 py-1.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-xl text-xs flex items-center space-x-1"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i><span>Goal Active</span></span>`;
-  } else {
-    btnContainer.innerHTML = `
-      <button onclick="adoptAiGoal(${r.recommendation_id}); closeAiRecDetailModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-md shadow-brand-500/20 flex items-center space-x-1.5">
-        <i data-lucide="target" class="w-3.5 h-3.5 text-white"></i>
-        <span>Set as Target Goal</span>
-      </button>
-    `;
-  }
-
-  modal.classList.remove('hidden');
-  if (window.lucide) lucide.createIcons();
-}
-
-function closeAiRecDetailModal() {
-  const modal = document.getElementById('ai-rec-detail-modal');
-  if (modal) modal.classList.add('hidden');
-}
-
   // Load Coach Feedback
   try {
     let fbUrl = '/api/coach/feedback';
@@ -1300,6 +1250,101 @@ function closeAiRecDetailModal() {
     }
   } catch (e) { console.error(e); }
 }
+
+// AI RECOMMENDATION DETAIL MODAL
+async function openAiRecDetailModal(recId) {
+  const dashRecs = window.cachedDashboardRecs || [];
+  const fullRecs = window.cachedFullRecs || [];
+  let r = dashRecs.find(item => item.recommendation_id == recId) || 
+          fullRecs.find(item => item.recommendation_id == recId);
+  
+  if (!r && Array.isArray(window.cachedSessionAnalytics)) {
+    for (const s of window.cachedSessionAnalytics) {
+      if (s.session_recommendations) {
+        const found = s.session_recommendations.find(item => item.recommendation_id == recId);
+        if (found) {
+          r = { ...found, sport_name: s.sport_name };
+          break;
+        }
+      }
+    }
+  }
+
+  if (!r) {
+    try {
+      const res = await fetch('/api/ai/recommendations', { headers: authHeaders() });
+      if (res.ok) {
+        const allRecs = await res.json();
+        r = allRecs.find(item => item.recommendation_id == recId);
+      }
+    } catch (e) {
+      console.error('Error fetching recommendation for modal:', e);
+    }
+  }
+
+  if (!r) {
+    showToast('Recommendation details not found', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('ai-rec-detail-modal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('ardm-title');
+  if (titleEl) titleEl.textContent = r.title || 'AI Recommendation Plan';
+  
+  const sportEl = document.getElementById('ardm-sport-name');
+  if (sportEl) sportEl.textContent = r.sport_name || 'Athletics';
+  
+  const issueEl = document.getElementById('ardm-detected-issue');
+  if (issueEl) issueEl.textContent = r.detected_issue || 'General Form & Mechanics Optimization';
+  
+  const evidenceEl = document.getElementById('ardm-evidence');
+  if (evidenceEl) evidenceEl.textContent = r.evidence || 'Analyzed across logged workouts.';
+  
+  const goalEl = document.getElementById('ardm-suggested-goal');
+  if (goalEl) goalEl.textContent = r.suggested_goal || 'Maintain consistent execution in next workout.';
+  
+  const textContainer = document.getElementById('ardm-text');
+  if (textContainer) textContainer.innerHTML = formatAiText(r.recommendation_text || '');
+
+  const badge = document.getElementById('ardm-priority-badge');
+  if (badge) {
+    badge.textContent = `${r.priority || 'MEDIUM'} PRIORITY`;
+    if (r.priority === 'HIGH') {
+      badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
+    } else {
+      badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+    }
+  }
+
+  const btnContainer = document.getElementById('ardm-action-btn-container');
+  if (btnContainer) {
+    const activeGoals = window.cachedActiveGoals || [];
+    const existingGoal = activeGoals.find(g => g.title === r.title);
+    if (existingGoal) {
+      btnContainer.innerHTML = `<span class="px-3.5 py-1.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-extrabold rounded-xl text-xs flex items-center space-x-1"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i><span>Goal Active</span></span>`;
+    } else {
+      btnContainer.innerHTML = `
+        <button onclick="adoptAiGoal(${r.recommendation_id}); closeAiRecDetailModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-md shadow-brand-500/20 flex items-center space-x-1.5">
+          <i data-lucide="target" class="w-3.5 h-3.5 text-white"></i>
+          <span>Set as Target Goal</span>
+        </button>
+      `;
+    }
+  }
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeAiRecDetailModal() {
+  const modal = document.getElementById('ai-rec-detail-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+window.openAiRecDetailModal = openAiRecDetailModal;
+window.closeAiRecDetailModal = closeAiRecDetailModal;
 
 // MY SPORTS
 async function loadStudentSports() {
@@ -1864,14 +1909,30 @@ function formatAiText(text) {
   }).join('');
 }
 
+function onAiSessionSelect(sessionId) {
+  if (!sessionId) {
+    const card = document.getElementById('ai-session-detail-card');
+    if (card) card.classList.add('hidden');
+    return;
+  }
+  renderAiSessionDetailCard(sessionId);
+}
+window.onAiSessionSelect = onAiSessionSelect;
+
 function renderAiSessionDetailCard(sessionId) {
   const card = document.getElementById('ai-session-detail-card');
   if (!card) return;
 
-  const s = cachedSessionAnalytics.find(item => item.session_id === sessionId);
+  const s = cachedSessionAnalytics.find(item => item.session_id == sessionId);
   if (!s) {
     card.classList.add('hidden');
     return;
+  }
+
+  // Keep dropdown value in sync
+  const sessDropdown = document.getElementById('ai-session-dropdown');
+  if (sessDropdown && sessDropdown.value != s.session_id) {
+    sessDropdown.value = s.session_id;
   }
 
   card.classList.remove('hidden');
@@ -2082,6 +2143,68 @@ function renderAiSessionDetailCard(sessionId) {
   if (window.lucide) lucide.createIcons();
 }
 
+async function triggerAIAnalysis(sportId = null) {
+  const targetSportId = (sportId !== null && sportId !== undefined && sportId !== '') ? sportId : (currentAISportFilter || null);
+  
+  // Find Run AI Analysis buttons to show spinning indicator
+  const runBtns = document.querySelectorAll('button[onclick*="triggerAIAnalysis"]');
+  runBtns.forEach(b => {
+    b.disabled = true;
+    b.dataset.origHtml = b.innerHTML;
+    b.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline mr-1"></i><span>Analyzing...</span>`;
+  });
+  if (window.lucide) lucide.createIcons();
+
+  showToast('Running AI ML Performance Analysis...', 'info');
+
+  try {
+    let url = '/api/ai/analyze';
+    if (targetSportId) {
+      url += `?sport_id=${targetSportId}`;
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.message || 'Failed to run AI analysis');
+    }
+
+    if (data.has_sufficient_data === false) {
+      showToast(data.message || 'Record practice sessions before running AI analysis.', 'warning');
+    } else {
+      showToast(data.message || 'AI Performance Analysis completed successfully!', 'success');
+    }
+
+    // Refresh views
+    if (typeof loadAIRecommendations === 'function') {
+      await loadAIRecommendations(currentAISportFilter);
+    }
+    if (typeof loadDashboardPreviews === 'function') {
+      await loadDashboardPreviews();
+    }
+    if (typeof loadAnalyticsCharts === 'function' && typeof currentView !== 'undefined' && currentView === 'analytics') {
+      await loadAnalyticsCharts();
+    }
+    if (typeof loadNotifications === 'function') {
+      loadNotifications();
+    }
+  } catch (err) {
+    console.error('AI Analysis error:', err);
+    showToast(err.message || 'Error executing AI Analysis', 'error');
+  } finally {
+    runBtns.forEach(b => {
+      b.disabled = false;
+      if (b.dataset.origHtml) b.innerHTML = b.dataset.origHtml;
+    });
+    if (window.lucide) lucide.createIcons();
+  }
+}
+window.triggerAIAnalysis = triggerAIAnalysis;
+
 async function loadAIRecommendations(selectedSportId = null) {
   currentAISportFilter = selectedSportId;
   try {
@@ -2120,8 +2243,9 @@ async function loadAIRecommendations(selectedSportId = null) {
     if (sessDropdown) {
       sessDropdown.innerHTML = '';
       if (!cachedSessionAnalytics || cachedSessionAnalytics.length === 0) {
-        sessDropdown.innerHTML = '<option value="">No sessions recorded yet</option>';
-        document.getElementById('ai-session-detail-card').classList.add('hidden');
+        sessDropdown.innerHTML = '<option value="">No practice sessions found for this selection</option>';
+        const detailCard = document.getElementById('ai-session-detail-card');
+        if (detailCard) detailCard.classList.add('hidden');
       } else {
         cachedSessionAnalytics.forEach(s => {
           const cRatingStr = s.coach_rating ? `Coach Rating: ${s.coach_rating}/10` : 'Unrated';
@@ -2129,6 +2253,9 @@ async function loadAIRecommendations(selectedSportId = null) {
             <option value="${s.session_id}">${s.date} - ${s.sport_name} (${s.duration_minutes}m ${s.training_type.replace('_',' ')}) • ${cRatingStr}</option>
           `;
         });
+        sessDropdown.onchange = function() {
+          onAiSessionSelect(this.value);
+        };
         // Render first session details by default
         renderAiSessionDetailCard(cachedSessionAnalytics[0].session_id);
       }
@@ -2152,7 +2279,7 @@ async function loadAIRecommendations(selectedSportId = null) {
 
         sportsList.forEach(sp => {
           const icon = getSportIcon(sp.sport_name, 'w-3.5 h-3.5 inline');
-          const isActive = selectedSportId === sp.sport_id;
+          const isActive = selectedSportId == sp.sport_id;
           tabsContainer.innerHTML += `
             <button onclick="loadAIRecommendations(${sp.sport_id})" 
               class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${isActive ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}">
@@ -2166,7 +2293,7 @@ async function loadAIRecommendations(selectedSportId = null) {
       if (tabsWrapper) tabsWrapper.classList.add('hidden');
     }
 
-    if (!recs || recs.length === 0) {
+    if ((!recs || recs.length === 0) && (!analyses || analyses.length === 0) && (!sessionAnalytics || sessionAnalytics.length === 0)) {
       mainContainer.innerHTML = `
         <div class="empty-state-box p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <div class="w-16 h-16 bg-brand-50 dark:bg-brand-900/30 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2175,7 +2302,7 @@ async function loadAIRecommendations(selectedSportId = null) {
           <h3 class="text-lg font-bold text-slate-900 dark:text-white">No AI Analysis generated yet</h3>
           <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">Record practice sessions to trigger isolated, high-level ML performance analysis & domain-specific drill recommendations for each of your sports.</p>
           <div class="flex items-center justify-center space-x-3 mt-5">
-            <button onclick="triggerAIAnalysis()" class="px-5 py-2.5 bg-gradient-to-r from-brand-600 to-accent-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center space-x-1.5">
+            <button onclick="triggerAIAnalysis(${selectedSportId ? selectedSportId : ''})" class="px-5 py-2.5 bg-gradient-to-r from-brand-600 to-accent-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center space-x-1.5">
               <i data-lucide="zap" class="w-4 h-4 text-white"></i>
               <span>Run AI Analysis Now</span>
             </button>
@@ -2209,6 +2336,23 @@ async function loadAIRecommendations(selectedSportId = null) {
       });
     }
 
+    // Initialize groupedData from sportsList to ensure all sports with logged sessions appear
+    if (Array.isArray(sportsList)) {
+      sportsList.forEach(sp => {
+        if (!selectedSportId || selectedSportId == sp.sport_id) {
+          groupedData[sp.sport_name] = {
+            sport_id: sp.sport_id,
+            sport_name: sp.sport_name,
+            sport_category: sp.sport_category || 'OUTDOOR',
+            analysis: analysisMap[sp.sport_name] || null,
+            sessions: sessionsMap[sp.sport_name] || [],
+            recommendations: []
+          };
+        }
+      });
+    }
+
+    // Attach recommendations
     recs.forEach(r => {
       if (!groupedData[r.sport_name]) {
         groupedData[r.sport_name] = {
@@ -2431,7 +2575,7 @@ async function loadAIRecommendations(selectedSportId = null) {
               Specific ${group.sport_name} Corrective Routines (${group.recommendations.length})
             </h4>
             <div class="grid grid-cols-1 gap-4">
-              ${recsHtml}
+              ${recsHtml || `<div class="text-xs text-slate-400 italic p-3.5 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">No specific drill recommendations generated for ${group.sport_name} yet. Click "Re-analyze ${group.sport_name}" above to generate data-driven corrective routines.</div>`}
             </div>
           </div>
         </div>
