@@ -113,3 +113,43 @@ class GoalUpdate(BaseModel):
 class CoachAiSuggestionInput(BaseModel):
     coach_suggestion: str
 
+
+# AthletIQ AskAI Conversational Assistant
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    conversation_id: Optional[str] = None
+    sport_id: Optional[int] = None
+    student_id: Optional[int] = None
+    voice_mode: Optional[bool] = False
+
+class ChatMessageItem(BaseModel):
+    message_id: int
+    conversation_id: str
+    sender: str
+    message: str
+    message_type: Optional[str] = "text"
+    sources: Optional[List[str]] = []
+    suggested_questions: Optional[List[str]] = []
+    created_at: str
+
+class ChatResponse(BaseModel):
+    message: str
+    role: str
+    conversation_id: str
+    title: Optional[str] = None
+    sources: List[str] = []
+    suggested_questions: List[str] = []
+    voice_mode: Optional[bool] = False
+
+class ConversationSummary(BaseModel):
+    conversation_id: str
+    title: str
+    role: str
+    sport_id: Optional[int] = None
+    sport_name: Optional[str] = None
+    student_id: Optional[int] = None
+    student_name: Optional[str] = None
+    message_count: int = 0
+    created_at: str
+    updated_at: str
+

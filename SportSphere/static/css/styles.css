@@ -135,3 +135,82 @@ html.dark select option {
   background-color: #2563EB !important;
   color: #FFFFFF !important;
 }
+
+/* AthletIQ AskAI Waveform Animations */
+@keyframes askAiWave {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 18px;
+  }
+}
+
+.animate-wave-1 {
+  animation: askAiWave 0.8s ease-in-out infinite;
+}
+.animate-wave-2 {
+  animation: askAiWave 0.9s ease-in-out infinite 0.15s;
+}
+.animate-wave-3 {
+  animation: askAiWave 1.1s ease-in-out infinite 0.3s;
+}
+.animate-wave-4 {
+  animation: askAiWave 0.75s ease-in-out infinite 0.2s;
+}
+
+@keyframes askAiFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: askAiFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.askai-markdown-content strong {
+  font-weight: 700;
+  color: inherit;
+}
+
+.askai-markdown-content ul, 
+.askai-markdown-content ol {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.askai-markdown-content li {
+  margin-bottom: 2px;
+}
+
+/* Floating AskAI Widget Glow & Movement */
+#askai-floating-widget {
+  touch-action: none;
+  filter: drop-shadow(0 10px 25px rgba(37, 99, 235, 0.35));
+}
+
+#askai-floating-widget:hover {
+  filter: drop-shadow(0 12px 30px rgba(37, 99, 235, 0.5));
+}
+
+#askai-floating-panel {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  will-change: transform, opacity;
+}
+
+@media (max-width: 640px) {
+  #askai-floating-panel {
+    bottom: 12px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    height: 75vh !important;
+  }
+}
+

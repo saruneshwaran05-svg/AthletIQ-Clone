@@ -278,6 +278,38 @@ def init_db():
         );
         """)
 
+        # 13. AI Conversations
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ai_conversations (
+            conversation_id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('STUDENT', 'COACH')),
+            sport_id INTEGER,
+            student_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            FOREIGN KEY (sport_id) REFERENCES sports(sport_id) ON DELETE SET NULL,
+            FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+        """)
+
+        # 14. AI Messages
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ai_messages (
+            message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT NOT NULL,
+            sender TEXT NOT NULL CHECK (sender IN ('user', 'assistant', 'system')),
+            message TEXT NOT NULL,
+            message_type TEXT DEFAULT 'text',
+            sources TEXT,
+            suggested_questions TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES ai_conversations(conversation_id) ON DELETE CASCADE
+        );
+        """)
+
         # Performance & Security Indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ps_student_sport ON practice_sessions(student_id, sport_id);")
@@ -286,6 +318,8 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_student_sports ON student_sports(student_id, sport_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_perf_records_session ON performance_records(session_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_problems_session ON problems(session_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_conv_user ON ai_conversations(user_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_msg_conv ON ai_messages(conversation_id);")
 
         seed_default_sports(cursor)
         print("Database schema initialized and hardened at:", DB_PATH)
@@ -320,7 +354,7 @@ def clear_all_data():
         cursor = conn.cursor()
         cursor.execute("PRAGMA foreign_keys = OFF;")
         tables = [
-            "notifications", "goals", "coach_feedback", "coach_connections",
+            "ai_messages", "ai_conversations", "notifications", "goals", "coach_feedback", "coach_connections",
             "ai_recommendations", "ai_analyses", "problems", "performance_records",
             "practice_sessions", "student_sports", "sports", "users"
         ]

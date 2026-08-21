@@ -301,3 +301,90 @@ def get_session_wise_ai_analytics(student_id: Optional[int] = Query(None), sport
 
         return sessions
 
+
+# =====================================================================
+# ATHLETIQ ASKAI CONVERSATIONAL ASSISTANT ENDPOINTS
+# =====================================================================
+from app.schemas import ChatRequest, ChatResponse
+from app.ai_chat_engine import AthletIQAskAIEngine, ConversationManager
+
+@router.post("/chat", response_model=ChatResponse)
+def ask_ai_chat(req: ChatRequest, user: dict = Depends(get_current_user)):
+    """
+    Main conversational AskAI endpoint.
+    Processes natural language queries from Students and Coaches,
+    grounding answers in actual AthletIQ performance records, analytics, and goals.
+    """
+    try:
+        result = AthletIQAskAIEngine.process_chat(
+            user=user,
+            message=req.message,
+            conversation_id=req.conversation_id,
+            sport_id=req.sport_id,
+            student_id=req.student_id,
+            voice_mode=req.voice_mode or False
+        )
+        return result
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        print(f"Error in /api/ai/chat: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process sports AI response. Please try again.")
+
+
+@router.get("/conversations")
+def list_conversations(user: dict = Depends(get_current_user)):
+    """Returns all past AskAI conversations for the authenticated user."""
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT c.conversation_id, c.title, c.role, c.sport_id, s.name as sport_name,
+                   c.student_id, u.name as student_name, c.created_at, c.updated_at,
+                   (SELECT COUNT(*) FROM ai_messages m WHERE m.conversation_id = c.conversation_id) as message_count
+            FROM ai_conversations c
+            LEFT JOIN sports s ON c.sport_id = s.sport_id
+            LEFT JOIN users u ON c.student_id = u.user_id
+            WHERE c.user_id = ?
+            ORDER BY c.updated_at DESC
+        """, (user["user_id"],))
+        rows = [dict(r) for r in cursor.fetchall()]
+        return rows
+
+
+@router.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(conversation_id: str, user: dict = Depends(get_current_user)):
+    """Fetches full message history for a specific conversation."""
+    with db_session() as conn:
+        cursor = conn.cursor()
+        # Verify ownership
+        cursor.execute("SELECT conversation_id FROM ai_conversations WHERE conversation_id = ? AND user_id = ?", (conversation_id, user["user_id"]))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Conversation not found or access denied")
+
+        messages = ConversationManager.get_conversation_history(conversation_id, limit=50)
+        return messages
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, user: dict = Depends(get_current_user)):
+    """Deletes a specific AskAI conversation."""
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT conversation_id FROM ai_conversations WHERE conversation_id = ? AND user_id = ?", (conversation_id, user["user_id"]))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        cursor.execute("DELETE FROM ai_conversations WHERE conversation_id = ?", (conversation_id,))
+        return {"message": "Conversation deleted successfully"}
+
+
+@router.post("/conversations/clear")
+def clear_all_conversations(user: dict = Depends(get_current_user)):
+    """Clears all conversation history for the authenticated user."""
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ai_conversations WHERE user_id = ?", (user["user_id"],))
+        return {"message": "All conversations cleared successfully"}
+

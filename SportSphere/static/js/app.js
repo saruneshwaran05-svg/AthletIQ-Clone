@@ -159,6 +159,13 @@ let previousActiveView = 'dashboard';
 
 // Navigation Router
 function navTo(viewName) {
+  if (viewName === 'ask-ai') {
+    if (typeof toggleAskAiFloatingPanel === 'function') {
+      toggleAskAiFloatingPanel(true);
+    }
+    return;
+  }
+
   window.scrollTo(0, 0);
   const mainScroll = document.querySelector('#app-view main');
   if (mainScroll) mainScroll.scrollTop = 0;
@@ -187,6 +194,7 @@ function navTo(viewName) {
   if (topBarTitle) {
     const titles = {
       'dashboard': 'Dashboard',
+      'ask-ai': 'AthletIQ AskAI Assistant',
       'my-sports': 'My Sports',
       'practice': 'Record Practice Session',
       'history': 'Practice History',
